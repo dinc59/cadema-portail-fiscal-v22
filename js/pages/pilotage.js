@@ -22,7 +22,7 @@ export function render({year, params}) {
     <div><p class="ph-eyebrow">Pilotage</p><h1>${esc(head[0])}</h1><p class="ph-lede">${esc(head[1])}</p></div>
     <div class="ph-actions">
       ${tab === 'priorites' ? `<button class="btn btn-primary" data-new-task>${icon('plus', 16)}Nouvelle priorité</button>` : ''}
-      ${tab === 'calendrier' ? `<button class="btn btn-primary" data-new-event>${icon('plus', 16)}Nouvelle échéance</button>` : ''}
+      ${tab === 'calendrier' ? `<button class="btn" data-echeances>${icon('calendar', 16)}Échéances de l’année</button><button class="btn btn-primary" data-new-event>${icon('plus', 16)}Nouvelle échéance</button>` : ''}
     </div>
   </section>
   <div class="toolbar"><nav class="tabs" aria-label="Sections">
@@ -152,6 +152,83 @@ function calendar() {
     </button>`).join('')}</div>`).join('')}</article>`;
 }
 
+/* Échéances fiscales récurrentes d'un EPCI. « légale » : date limite fixée par
+   un texte ; « indicative » : date habituelle d'un envoi de l'État, qui peut
+   varier d'une année à l'autre. Liste à valider par le pôle avant écriture. */
+function fiscalDeadlines(y) {
+  return [
+    {d: `${y}-02-15`, kind: 'indicative', module: 'Budget', title: 'Débat d’orientation budgétaire', ref: 'CGCT, art. L2312-1 et L5211-36 : dans les deux mois précédant le vote du budget.'},
+    {d: `${y}-03-15`, kind: 'indicative', module: 'Recettes', title: 'Réception de l’état 1259 (bases prévisionnelles)', ref: 'Notifié par la DGFiP, en général à la mi-mars.'},
+    {d: `${y}-04-05`, kind: 'indicative', module: 'Recettes', title: 'Notification de la DGF', ref: 'Publiée par la DGCL, en général début avril.'},
+    {d: `${y}-04-15`, kind: 'légale', module: 'Recettes', title: `Vote du budget et des taux ${y} (CFE, TEOM) et transmission aux services fiscaux`, ref: 'CGCT, art. L1612-2 ; CGI, art. 1639 A. Le 30 avril l’année du renouvellement des conseils.'},
+    {d: `${y}-05-01`, kind: 'légale', module: 'VM', title: 'Versement mobilité : transmission d’un nouveau taux applicable au 1er juillet', ref: 'CGCT, art. L2333-67.'},
+    {d: `${y}-06-15`, kind: 'indicative', module: 'Recettes', title: 'Notification du FPIC : répartition dérogatoire à délibérer dans les deux mois', ref: 'CGCT, art. L2336-3.'},
+    {d: `${y}-06-30`, kind: 'légale', module: 'Budget', title: `Vote du compte financier unique ${y - 1}`, ref: 'CGCT, art. L1612-12.'},
+    {d: `${y}-10-01`, kind: 'légale', module: 'CFE', title: `Délibérations fiscales pour ${y + 1} (exonérations, abattements, base minimum CFE, coefficient TASCOM)`, ref: 'CGI, art. 1639 A bis, 1647 D ; loi 72-657, art. 3 (TASCOM).'},
+    {d: `${y}-10-15`, kind: 'légale', module: 'TEOM', title: `TEOM : délibérations pour ${y + 1} (institution, zonage, exonérations)`, ref: 'CGI, art. 1639 A bis II.'},
+    {d: `${y}-11-01`, kind: 'légale', module: 'VM', title: `Versement mobilité : transmission d’un nouveau taux applicable au 1er janvier ${y + 1}`, ref: 'CGCT, art. L2333-67.'},
+    {d: `${y}-12-15`, kind: 'légale', module: 'CFE', title: 'Date limite de paiement de la CFE par les entreprises', ref: 'CGI, art. 1679 quinquies.'},
+  ];
+}
+
+function echeancesDrawer() {
+  const now = new Date();
+  let year = now.getMonth() >= 8 ? now.getFullYear() + 1 : now.getFullYear();
+  const key = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const body = () => {
+    const today = new Date(now.toDateString());
+    const have = new Set(M.events().map(e => `${fmt.iso(e.start)}|${key(e.title)}`));
+    return `<div class="notice">${icon('info', 16)}<span>Dates de droit commun pour une intercommunalité. Vérifiez-les pour Mayotte et cochez celles à ajouter : rien n’est écrit avant « Ajouter ».</span></div>
+      <div class="year-chips mt" role="group" aria-label="Année">${[now.getFullYear(), now.getFullYear() + 1].map(y => `<button type="button" class="chip chip-year" aria-pressed="${y === year}" data-ech-year="${y}">${y}</button>`).join('')}</div>
+      <ul class="ech-list">${fiscalDeadlines(year).map((x, i) => {
+        const d = new Date(`${x.d}T00:00:00`);
+        const dup = have.has(`${x.d}|${key(x.title)}`);
+        const past = d < today;
+        return `<li class="ech${dup ? ' is-dup' : ''}"><label>
+          <input type="checkbox" class="sel" data-ech="${i}"${!dup && !past ? ' checked' : ''}${dup ? ' disabled' : ''}>
+          <span class="date-tile"><b>${d.getDate()}</b><span>${esc(d.toLocaleDateString('fr-FR', {month: 'short'}))}</span></span>
+          <span class="row-main"><b>${esc(x.title)}</b><span>${esc(x.ref)}</span></span>
+          ${dup ? badge('Déjà au calendrier', 'good') : past ? badge('Passée', 'neutral') : badge(x.kind === 'légale' ? 'Date limite' : 'Indicative', x.kind === 'légale' ? 'warn' : 'info')}
+        </label></li>`;
+      }).join('')}</ul>`;
+  };
+  const footer = () => `<button class="btn btn-ghost" data-close>Annuler</button><button class="btn btn-primary" data-ech-add>${icon('plus', 15)}Ajouter au calendrier</button>`;
+  openDrawer({
+    title: 'Échéances fiscales de l’année', subtitle: 'Ajoutées à la table Calendrier_Fiscal', wide: true, body: body(), footer: footer(),
+    onMount(el) {
+      const count = () => { const n = el.querySelectorAll('[data-ech]:checked').length; const b = el.querySelector('[data-ech-add]'); b.disabled = !n; b.innerHTML = `${icon('plus', 15)}Ajouter ${n} échéance${n > 1 ? 's' : ''}`; };
+      count();
+      el.addEventListener('change', e => { if (e.target.matches('[data-ech]')) count(); });
+      el.addEventListener('click', async e => {
+        const yb = e.target.closest('[data-ech-year]');
+        if (yb) { year = Number(yb.dataset.echYear); el.querySelector('.drawer-body').innerHTML = body(); count(); return; }
+        const add = e.target.closest('[data-ech-add]');
+        if (!add) return;
+        const list = fiscalDeadlines(year);
+        const picked = [...el.querySelectorAll('[data-ech]:checked')].map(c => list[Number(c.dataset.ech)]);
+        if (!picked.length) return;
+        let n = Math.max(0, ...rows('Calendrier_Fiscal').map(r => Number(String(r.Evenement_ID || '').replace(/\D/g, '')) || 0));
+        add.disabled = true;
+        try {
+          const ret = await act(picked.map(x => {
+            const sec = M.toGristDate(new Date(`${x.d}T00:00:00`));
+            return ['AddRecord', 'Calendrier_Fiscal', null, fieldsFor('Calendrier_Fiscal', {
+              Evenement_ID: `EVT-${String(++n).padStart(3, '0')}`, Titre: x.title, Module: x.module, Date_Debut: sec, Date_Fin: sec,
+              Responsable: author(), Priorite: x.kind === 'légale' ? 'Haute' : 'Normale', Statut: 'Planifié', Recurrence: 'Annuelle',
+              Notes: `${x.kind === 'légale' ? 'Date limite' : 'Date indicative'} · ${x.ref}`,
+            })];
+          }));
+          closeDrawer();
+          toast(`${picked.length} échéance${picked.length > 1 ? 's' : ''} ${year} ajoutée${picked.length > 1 ? 's' : ''}`, 'ok', {
+            action: 'Annuler', timeout: 9000,
+            onAction: async () => { try { await act(ret.filter(Number.isInteger).map(id => ['RemoveRecord', 'Calendrier_Fiscal', id])); toast('Ajout annulé', 'info'); } catch (err) { toast(err.message, 'error'); } },
+          });
+        } catch (err) { toast(err.message, 'error'); add.disabled = false; }
+      });
+    },
+  });
+}
+
 function eventDrawer(rowId) {
   const e = rowId ? M.events().find(x => x.rowId === rowId) : null;
   openDrawer({
@@ -223,6 +300,7 @@ export function mount(root, {params}) {
     const t = e.target.closest('[data-task]');
     if (t) return taskDrawer(Number(t.dataset.task));
     if (e.target.closest('[data-new-event]')) return eventDrawer(null);
+    if (e.target.closest('[data-echeances]')) return echeancesDrawer();
     const ev = e.target.closest('[data-event]');
     if (ev) return eventDrawer(Number(ev.dataset.event));
   });

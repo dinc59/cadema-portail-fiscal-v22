@@ -1,6 +1,7 @@
 import * as M from '../model.js';
 import { esc, attr, icon, fmt, badge } from '../ui.js';
 import { stackedBars, ring, mountChart } from '../charts.js';
+import { unseen, markSeen } from '../changelog.js';
 
 function comparable(year) {
   /* Évolution à périmètre constant : seuls les produits connus les deux
@@ -22,6 +23,7 @@ export function render({year, app}) {
   const q = M.quality(year);
   const ys = M.taxYears().filter(y => y <= Math.max(year, ...M.taxYears()));
   const today = new Date();
+  const news = unseen();
   const hello = today.getHours() < 18 ? 'Bonjour' : 'Bonsoir';
   const plans = M.plans();
   const planCounts = M.PLAN_STATUSES.map(s => [s, plans.filter(p => p.status === s).length]).filter(([, n]) => n);
@@ -39,10 +41,17 @@ export function render({year, app}) {
       <p class="ph-lede">Recettes, redevance, priorités et qualité des données — tout est lu en direct dans le document Grist du pôle.</p>
     </div>
     <div class="ph-actions">
-      <a class="btn" href="#/pilotage?tab=qualite">${icon('shield', 16)}Contrôle qualité</a>
+      <a class="btn" href="#/reunion">${icon('present', 16)}Mode réunion</a>
+      <a class="btn" href="#/rapport">${icon('download', 16)}Point mensuel (PDF)</a>
       <a class="btn btn-primary" href="#/pilotage?new=1">${icon('plus', 16)}Nouvelle priorité</a>
     </div>
   </section>
+  ${news.length ? `<div class="news-banner" data-news>
+    <span class="news-ic">${icon('info', 16)}</span>
+    <span class="row-main"><b>Le portail a été mis à jour</b><span>${esc(news.map(r => r.title).join(' · '))}</span></span>
+    <a class="btn btn-sm" href="#/nouveautes">Voir les nouveautés</a>
+    <button class="icon-btn" data-news-x aria-label="Masquer" data-tip="Masquer">${icon('x', 16)}</button>
+  </div>` : ''}
 
   <section class="grid g-4">
     <a class="card kpi" href="#/recettes">
@@ -150,5 +159,18 @@ export const planTone = s => ({'Réalisé': 'good', 'En cours': 'info', 'À séc
 export function mount(root, {year}) {
   const data = M.taxYears().map(y => ({year: y, ...M.taxTotal(y)}));
   mountChart(root.querySelector('[data-chart="traj"]'), w => stackedBars(data, {width: w, active: year}));
-  root.addEventListener('click', e => { if (e.target.closest('.hit[data-year]')) location.hash = '#/recettes'; });
+  root.addEventListener('click', e => {
+    if (e.target.closest('.hit[data-year]')) { location.hash = '#/recettes'; return; }
+    if (e.target.closest('[data-news-x]')) {
+      markSeen();
+      const b = root.querySelector('[data-news]');
+      document.querySelector('.news-dot')?.remove();
+      /* Sortie plus rapide que l'entrée : le bandeau s'efface, puis la place se referme. */
+      b.animate([{opacity: 1, transform: 'none'}, {opacity: 0, transform: 'translateY(-4px)'}], {duration: 150, easing: 'ease-out'}).onfinish = () => {
+        const h = b.offsetHeight;
+        b.style.visibility = 'hidden';
+        b.animate([{height: `${h}px`, marginBottom: '16px'}, {height: '0px', marginBottom: '0px'}], {duration: 180, easing: 'cubic-bezier(.23,1,.32,1)'}).onfinish = () => b.remove();
+      };
+    }
+  });
 }

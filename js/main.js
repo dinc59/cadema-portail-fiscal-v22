@@ -11,6 +11,10 @@ import * as finances from './pages/finances.js';
 import * as pilotage from './pages/pilotage.js';
 import * as documents from './pages/documents.js';
 import * as equipe from './pages/equipe.js';
+import * as nouveautes from './pages/nouveautes.js';
+import * as reunion from './pages/reunion.js';
+import * as rapport from './pages/rapport.js';
+import { unseen } from './changelog.js';
 
 const store = {
   get: k => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -35,7 +39,7 @@ const NAV = [
   {id: 'pilotage', label: 'Pilotage', href: '#/pilotage', menu: 'pilotage'},
   {id: 'documents', label: 'Documents', href: '#/documents'},
 ];
-const PAGES = {accueil, recettes, redevance, finances, pilotage, documents, equipe};
+const PAGES = {accueil, recettes, redevance, finances, pilotage, documents, equipe, nouveautes, reunion, rapport};
 
 /* Fonds disponibles. « Tamisé » est un sombre adouci, plus clair que « Sombre ». */
 const THEMES = [
@@ -105,7 +109,7 @@ function header() {
           ${icon('bell', 18)}${unread ? `<span class="dot-count">${unread}</span>` : ''}
         </button>
         <button class="me-btn" data-pop="me" aria-haspopup="menu" aria-expanded="false" aria-label="Profil et réglages">
-          ${avatar(app.profile || 'Équipe', 30)}<span class="sync-dot" data-sync="${db.saving ? 'saving' : 'ok'}" aria-hidden="true"></span>
+          ${avatar(app.profile || 'Équipe', 30)}${unseen().length ? '<span class="news-dot" aria-hidden="true"></span>' : ''}<span class="sync-dot" data-sync="${db.saving ? 'saving' : 'ok'}" aria-hidden="true"></span>
         </button>
         <button class="top-icon burger" data-burger aria-label="Menu" aria-expanded="false">${icon('menu', 20)}</button>
       </div>
@@ -235,6 +239,10 @@ function meMenu() {
     <div class="me-people">${ppl.map(p => `<button class="chip${p.name === app.profile ? ' is-on' : ''}" data-profile="${attr(p.name)}">${esc(p.name)}</button>`).join('') || '<span class="muted">Aucun utilisateur dans la table Utilisateurs</span>'}</div>
     <p class="menu-hint-line">Sert à signer vos modifications. La connexion reste gérée par Grist.</p>
     <div class="menu-sep"></div>
+    <a class="menu-item" href="#/nouveautes" role="menuitem">${icon('info', 16)}<span>Nouveautés du portail</span>${unseen().length ? `<span class="badge badge-accent">${unseen().length} nouvelle${unseen().length > 1 ? 's' : ''}</span>` : ''}</a>
+    <a class="menu-item" href="#/reunion" role="menuitem">${icon('present', 16)}<span>Mode réunion</span></a>
+    <a class="menu-item" href="#/rapport" role="menuitem">${icon('download', 16)}<span>Point mensuel (PDF)</span></a>
+    <div class="menu-sep"></div>
     <a class="menu-item" href="#/equipe" role="menuitem">${icon('users', 16)}<span>Équipe &amp; paramètres</span></a>
     <button class="menu-item" data-refresh role="menuitem">${icon('refresh', 16)}<span>Actualiser depuis Grist</span><span class="menu-hint">${db.syncedAt ? esc(fmt.rel(db.syncedAt)) : ''}</span></button>
     <div class="menu-sep"></div>
@@ -251,6 +259,9 @@ function paletteItems() {
     {kind: 'Page', label: 'Calendrier fiscal', href: '#/pilotage?tab=calendrier', ic: 'calendar'},
     {kind: 'Page', label: 'Qualité des données', href: '#/pilotage?tab=qualite', ic: 'shield'},
     {kind: 'Page', label: 'Recouvrement de la redevance', href: '#/redevance?tab=recouvrement', ic: 'wallet'},
+    {kind: 'Page', label: 'Nouveautés du portail', href: '#/nouveautes', ic: 'info'},
+    {kind: 'Page', label: 'Mode réunion', href: '#/reunion', ic: 'present'},
+    {kind: 'Page', label: 'Point mensuel (PDF)', href: '#/rapport', ic: 'download'},
     {kind: 'Page', label: 'Dotations DGF & FPIC', href: '#/finances?tab=dotations', ic: 'landmark'},
     {kind: 'Page', label: 'Équipe & paramètres', href: '#/equipe', ic: 'users'},
     ...M.TAXES.map(t => ({kind: 'Recette', label: `${t.code} · ${t.label}`, href: `#/recettes/${t.code}`, ic: 'coins'})),
@@ -342,6 +353,7 @@ function tabsPill(slide) {
 /* `enter` : 'full' (nouvelle page), 'soft' (changement d'onglet), 'none'
    (rafraîchissement : rien ne bouge). */
 export function render({keepScroll = false, enter = keepScroll ? 'none' : 'full'} = {}) {
+  document.body.classList.remove('is-meeting', 'is-report');
   const special = shellState();
   if (special) { root.innerHTML = special; mounted = false; return; }
   const years = M.years();
@@ -358,7 +370,7 @@ export function render({keepScroll = false, enter = keepScroll ? 'none' : 'full'
   document.body.classList.toggle('soft-enter', enter === 'soft');
   const ctx = {year: app.year, sub: app.route.sub, params: app.route.params, app, render};
   root.innerHTML = `${header()}<main id="main" class="page page-${app.route.page}" tabindex="-1">${page.render(ctx)}</main>
-    <footer class="foot"><span>${LOGO.replace('logo-mark', 'logo-mark logo-sm')} Portail Fiscal CADEMA</span><span>Données : document Grist du pôle · lecture et écriture en direct</span></footer>`;
+    <footer class="foot"><span>${LOGO.replace('logo-mark', 'logo-mark logo-sm')} Portail Fiscal CADEMA</span><span>Données : document Grist du pôle · lecture et écriture en direct · <a class="link" href="#/nouveautes">Nouveautés</a></span></footer>`;
   page.mount?.(root.querySelector('main'), ctx);
   moveIndicator(false);
   tabsPill(enter === 'soft');
