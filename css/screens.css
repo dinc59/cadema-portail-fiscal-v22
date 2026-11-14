@@ -174,3 +174,67 @@
   .plan { grid-template-columns: minmax(0, 1fr); }
   .cfu-row { grid-template-columns: 90px 1fr 70px; gap: 10px; }
 }
+
+/* ── Sélection multiple ───────────────────────────────────────────── */
+.t .sel-cell { width: 44px; padding-right: 0; cursor: pointer; }
+.t th.sel-cell { cursor: default; }
+input.sel { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; vertical-align: middle; }
+.rs-table tr.is-picked td { background: var(--accent-soft); }
+.bulk {
+  position: fixed; left: 50%; bottom: 20px; z-index: 40; display: flex; align-items: center; gap: 12px;
+  padding: 8px 8px 8px 16px; border-radius: 14px; background: var(--top); color: var(--top-ink);
+  box-shadow: 0 18px 40px -12px rgba(0, 0, 0, .45), 0 0 0 1px rgba(255, 255, 255, .06);
+  opacity: 0; transform: translate(-50%, 16px) scale(.98); pointer-events: none; visibility: hidden;
+  transition: opacity 150ms ease, transform 150ms var(--ease-out), visibility 0s 150ms;
+}
+.bulk[data-show] {
+  opacity: 1; transform: translate(-50%, 0); pointer-events: auto; visibility: visible;
+  transition: opacity 200ms ease, transform 260ms var(--ease-out), visibility 0s;
+}
+.bulk-count { font-size: 13px; white-space: nowrap; color: var(--top-ink-2); }
+.bulk-count b { color: var(--top-ink); font-variant-numeric: tabular-nums; font-size: 14px; }
+.bulk-sep { width: 1px; height: 20px; background: rgba(255, 255, 255, .14); }
+.bulk-field { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--top-ink-2); white-space: nowrap; }
+.bulk-field select {
+  height: 32px; padding: 0 30px 0 10px; border: 0; border-radius: 8px; font-size: 13px; appearance: none; cursor: pointer; outline: none;
+  background: var(--top-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239db0b8' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 9px center;
+  color: var(--top-ink); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08);
+}
+.bulk-field select:focus-visible { box-shadow: inset 0 0 0 1.5px var(--gold); }
+.bulk .bulk-x { color: var(--top-ink-2); }
+@media (hover: hover) and (pointer: fine) { .bulk .bulk-x:hover { background: var(--top-2); color: var(--top-ink); } }
+body:has(.bulk[data-show]) .toasts { bottom: 84px; }
+.toasts { transition: bottom 200ms var(--ease-out); }
+
+/* ── Saisie rapide des SIRET ──────────────────────────────────────── */
+.quick-note { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--surface-2); flex-wrap: wrap; }
+.quick-ic { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: var(--accent-soft); color: var(--accent); flex: none; }
+.quick-note .row-main span { max-width: 70ch; }
+.kbd-l { background: var(--sunk); color: var(--ink-2); box-shadow: inset 0 -1px 0 var(--line-2); }
+.quick-progress { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: baseline; min-width: 180px; font-size: 12.5px; color: var(--ink-3); }
+.quick-progress b { font-family: var(--serif); font-size: 20px; font-weight: 500; color: var(--ink); }
+.quick-progress .bar { grid-column: 1 / -1; height: 5px; }
+.quick-progress .bar > span { background: var(--good); transition: width 300ms var(--ease-out); }
+.siret-cell { width: 230px; }
+.siret-wrap { position: relative; display: block; }
+.siret-in { width: 100%; height: 34px; font-family: var(--mono); font-size: 13px; letter-spacing: .02em; padding-right: 32px; }
+.siret-in[aria-invalid="true"] { box-shadow: inset 0 0 0 1.5px var(--critical), 0 0 0 4px color-mix(in srgb, var(--critical) 14%, transparent); }
+.siret-ok { position: absolute; right: 9px; top: 50%; translate: 0 -50%; color: var(--good); display: grid; }
+.siret-ok { animation: pop-in 220ms var(--ease-out) both; }
+@keyframes pop-in { from { opacity: 0; transform: scale(.6); } }
+body.no-enter .siret-ok { animation: none; }
+.rs-table tr.is-done td:not(.siret-cell):not(.sel-cell) { color: var(--ink-3); }
+
+/* ── Doublons de la table Taxes ───────────────────────────────────── */
+.dupe-note { display: flex; align-items: center; gap: 14px; padding: 14px 16px; margin-bottom: 16px; box-shadow: var(--sh-1), inset 4px 0 0 var(--critical); flex-wrap: wrap; }
+
+@media (max-width: 640px) {
+  .bulk { left: 12px; right: 12px; bottom: 12px; transform: translateY(16px) scale(.98); flex-wrap: wrap; gap: 8px; }
+  .bulk[data-show] { transform: none; }
+  .bulk-sep { display: none; }
+  .siret-cell { width: auto; min-width: 170px; }
+}
+@media (prefers-reduced-motion: reduce) { .bulk, .bulk[data-show] { transform: translate(-50%, 0); } .siret-ok { animation: none; } }
+
+/* La barre en série est positionnée par transform : pas d’animation d’entrée de page. */
+.page > .bulk { animation: none; }

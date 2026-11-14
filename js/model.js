@@ -96,6 +96,16 @@ export function taxCagr(code) {
   return n > 0 ? {rate: Math.pow(last.amount / first.amount, 1 / n) - 1, from: first.year, to: last.year} : null;
 }
 
+/* Toutes les lignes non retenues de la table Taxes, tous produits et exercices. */
+export function taxDupes() {
+  const out = [];
+  for (const t of TAXES) for (const y of taxYears()) {
+    const c = taxCell(t.code, y);
+    if (c?.dupeIds?.length) out.push({code: t.code, year: y, keep: c.rowId, ids: c.dupeIds});
+  }
+  return out;
+}
+
 export function taxYears() {
   const set = new Set();
   for (const r of rows('Taxes')) if (num(r.Exercice) > 2000) set.add(num(r.Exercice));
@@ -252,7 +262,7 @@ export function quality(year) {
   }
   add({id: 'tax-dupes', level: 'critical', title: 'Doublons dans les recettes fiscales',
     ok: !dupes.length, count: dupes.length, detail: dupes.join(' · '),
-    fix: 'Supprimer la ligne en double depuis la fiche de la recette (la plus avancée est retenue).', route: '#/recettes', ratio: cells ? dupes.length / cells : 0});
+    fix: 'Les supprimer en un clic depuis Recettes (la ligne la plus avancée est conservée).', route: '#/recettes', ratio: cells ? dupes.length / cells : 0});
   add({id: 'tax-gaps', level: 'warn', title: 'Années sans produit renseigné',
     ok: !gaps.length, count: gaps.length, detail: gaps.join(' · '),
     fix: 'Saisir le produit depuis la fiche de la recette.', route: '#/recettes', ratio: cells ? gaps.length / cells : 0});
@@ -266,11 +276,11 @@ export function quality(year) {
   const toCheck = rs.list.filter(x => x.situation === 'À vérifier' || x.situation === 'À compléter');
   add({id: 'rs-check', level: 'warn', title: `Redevance ${year} : situations à vérifier`,
     ok: !toCheck.length, count: toCheck.length, detail: `${toCheck.length} dossier(s) sur ${rs.list.length}`,
-    fix: 'Qualifier chaque dossier : titré, soldé ou non concerné.', route: `#/redevance?situation=${encodeURIComponent('À vérifier')}`, ratio: rs.list.length ? toCheck.length / rs.list.length : 0});
+    fix: 'Cochez les dossiers puis qualifiez-les en série : titré, soldé ou non concerné.', route: `#/redevance?situation=${encodeURIComponent('À vérifier')}`, ratio: rs.list.length ? toCheck.length / rs.list.length : 0});
   const noSiret = companies().filter(c => !c.siret && !c.siren);
   add({id: 'rs-siret', level: 'info', title: 'Entreprises sans SIRET',
     ok: !noSiret.length, count: noSiret.length, detail: `${noSiret.length} fiche(s) sur ${companies().length}`,
-    fix: 'Renseigner le SIRET depuis la fiche entreprise.', route: '#/redevance?siret=0', ratio: companies().length ? noSiret.length / companies().length : 0});
+    fix: 'Saisie rapide : un numéro, Entrée, l’entreprise suivante.', route: '#/redevance?siret=0', ratio: companies().length ? noSiret.length / companies().length : 0});
   const noTrack = rs.list.filter(x => x.situation === 'Sans suivi');
   add({id: 'rs-track', level: 'warn', title: `Entreprises sans suivi ${year}`,
     ok: !noTrack.length, count: noTrack.length, detail: noTrack.slice(0, 6).map(x => x.name).join(' · '),

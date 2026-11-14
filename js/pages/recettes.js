@@ -27,6 +27,8 @@ function overview({year}) {
   const ys = [...new Set([...M.taxYears(), year])].sort((a, b) => a - b);
   const tot = M.taxTotal(year);
   const prods = M.TAXES.map(t => ({t, p: M.produit(t.code, year)})).filter(x => x.p);
+  const dupes = M.taxDupes();
+  const nDupes = dupes.reduce((s, d) => s + d.ids.length, 0);
   return `
   <section class="ph">
     <div>
@@ -39,6 +41,13 @@ function overview({year}) {
       <button class="btn btn-primary" data-edit-tax="" data-year="${year}">${icon('plus', 16)}Saisir un produit</button>
     </div>
   </section>
+
+  ${nDupes ? `<div class="dupe-note card">
+    <span class="check-ic tone-critical">${icon('alert', 16)}</span>
+    <span class="row-main"><b>${nDupes} ligne${nDupes > 1 ? 's' : ''} en double dans la table Taxes</b>
+      <span>${esc(dupes.map(d => `${d.code} ${d.year}`).join(' · '))}. Le portail affiche déjà la ligne la plus avancée ; les autres peuvent être supprimées.</span></span>
+    <button class="btn btn-sm btn-danger" data-del-dupes>${icon('trash', 14)}Supprimer les ${nDupes} doublon${nDupes > 1 ? 's' : ''}</button>
+  </div>` : ''}
 
   <article class="card">
     <div class="table-wrap">
@@ -346,6 +355,30 @@ export function mount(root, {year, sub, params}) {
       const ok = await confirmDialog({title: 'Supprimer ce doublon ?', message: `La ligne ${M.text(r?.Code)} ${M.num(r?.Exercice)} (${fmt.eur(M.num(r?.Produit))}), non retenue, sera supprimée de la table Taxes. La ligne retenue reste en place. Grist garde l’historique et permet d’annuler.`, confirm: 'Supprimer', danger: true});
       if (!ok) return;
       try { await act([['RemoveRecord', 'Taxes', id]]); toast('Doublon supprimé'); } catch (err) { toast(err.message, 'error'); }
+      return;
+    }
+    if (e.target.closest('[data-del-dupes]')) {
+      const dupes = M.taxDupes();
+      const ids = dupes.flatMap(d => d.ids);
+      if (!ids.length) return;
+      const ok = await confirmDialog({
+        title: `Supprimer ${ids.length} doublon${ids.length > 1 ? 's' : ''} ?`,
+        message: `Lignes non retenues de ${dupes.map(d => `${d.code} ${d.year}`).join(', ')}. Pour chaque exercice, la ligne affichée dans le portail est conservée. Vous pourrez annuler juste après.`,
+        confirm: 'Supprimer', danger: true,
+      });
+      if (!ok) return;
+      /* Copie des lignes avant suppression, pour pouvoir les recréer. */
+      const backup = ids.map(id => rows('Taxes').find(x => x.id === id)).filter(Boolean)
+        .map(x => fieldsFor('Taxes', Object.fromEntries(['Taxe_ID', 'Code', 'Intitule', 'Exercice', 'Taux', 'Base_Nette', 'Produit', 'Responsable', 'Statut', 'Source', 'Derniere_MAJ'].map(k => [k, x[k] ?? null]))));
+      try {
+        await act(ids.map(id => ['RemoveRecord', 'Taxes', id]));
+        toast(`${ids.length} doublon${ids.length > 1 ? 's' : ''} supprimé${ids.length > 1 ? 's' : ''}`, 'ok', {
+          action: 'Annuler', timeout: 9000,
+          onAction: async () => {
+            try { await act(backup.map(fields => ['AddRecord', 'Taxes', null, fields])); toast('Doublons restaurés', 'info'); } catch (err) { toast(err.message, 'error'); }
+          },
+        });
+      } catch (err) { toast(err.message, 'error'); }
       return;
     }
     if (e.target.closest('[data-export]')) {

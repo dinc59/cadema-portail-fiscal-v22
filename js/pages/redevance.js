@@ -1,6 +1,6 @@
 import * as M from '../model.js';
 import { rows, act, fieldsFor, uploadAttachment, openAttachment, attachmentIds } from '../grist.js';
-import { esc, attr, icon, fmt, badge, empty, openDrawer, patchDrawer, drawerOpen, drawerId, toast, field, select, formData, downloadCsv, flash } from '../ui.js';
+import { esc, attr, icon, fmt, badge, empty, openDrawer, patchDrawer, drawerOpen, drawerId, toast, field, select, formData, downloadCsv, flash, confirmDialog } from '../ui.js';
 import { author, render as rerender } from '../main.js';
 
 const SORTS = [['rest', 'Reste à recouvrer'], ['name', 'Nom (A→Z)'], ['billed', 'Montant facturé'], ['updated', 'Dernière mise à jour']];
@@ -8,6 +8,13 @@ const ACTIVITIES = ['Administration', 'Commerce', 'Hôtellerie/Restauration', 'I
 const tone = s => s === 'Sans suivi' ? 'neutral' : M.situationTone(s);
 
 const f = {q: '', situation: '', activity: '', sort: 'rest', siret: ''};
+/* Sélection multiple (par exercice) et SIRET saisis pendant la session :
+   une entreprise complétée reste visible dans la saisie rapide, cochée,
+   au lieu de disparaître de la liste sous les doigts. */
+const sel = new Set();
+let selYear = null;
+const siretDone = new Map();
+const quick = () => f.siret === '0';
 function readParams(params) {
   f.q = params.get('q') || '';
   f.situation = params.get('situation') || '';
@@ -31,7 +38,7 @@ function filtered(data) {
   let list = data.list.filter(x =>
     (!f.situation || x.situation === f.situation) &&
     (!f.activity || x.activity === f.activity) &&
-    (f.siret !== '0' || (!x.siret && !x.siren)) &&
+    (f.siret !== '0' || (!x.siret && !x.siren) || siretDone.has(x.id)) &&
     (!words.length || words.every(w => norm(`${x.name} ${x.siret} ${x.siren} ${x.titleNumber} ${x.address} ${x.activity}`).includes(w))));
   const by = {
     rest: (a, b) => (b.rest ?? -1) - (a.rest ?? -1) || a.name.localeCompare(b.name, 'fr'),
@@ -42,12 +49,32 @@ function filtered(data) {
   return list.sort(by);
 }
 
+const checkbox = (x) => `<td class="sel-cell"><input type="checkbox" class="sel" data-sel="${attr(x.id)}"${sel.has(x.id) ? ' checked' : ''} aria-label="Sélectionner ${attr(x.name)}"></td>`;
+
+function headRow(year) {
+  const all = '<th class="sel-cell"><input type="checkbox" class="sel" data-sel-all aria-label="Tout sélectionner"></th>';
+  return quick()
+    ? `<tr>${all}<th>Entreprise</th><th>SIRET</th><th>Situation ${year}</th><th class="num">Facturé</th></tr>`
+    : `<tr>${all}<th>Entreprise</th><th>Situation ${year}</th><th class="num">Facturé</th><th class="num">Réglé</th><th class="num">Reste</th><th>N° titre</th><th>Pièces</th></tr>`;
+}
+
 function tableRows(list) {
-  if (!list.length) return `<tr><td colspan="7">${empty('Aucune entreprise ne correspond', 'Modifiez la recherche ou les filtres.', '<button class="btn btn-sm" data-reset>Effacer les filtres</button>')}</td></tr>`;
+  if (!list.length) return `<tr><td colspan="8">${empty(quick() ? 'Toutes les entreprises ont un SIRET' : 'Aucune entreprise ne correspond', quick() ? 'Rien à compléter.' : 'Modifiez la recherche ou les filtres.', '<button class="btn btn-sm" data-reset>Effacer les filtres</button>')}</td></tr>`;
+  if (quick()) return list.map(x => {
+    const done = siretDone.has(x.id);
+    return `<tr data-open="${attr(x.id)}" class="${sel.has(x.id) ? 'is-picked' : ''}${done ? ' is-done' : ''}">
+      ${checkbox(x)}
+      <td><span class="strong">${esc(x.name)}</span><span class="sub">${esc([x.activity, x.address].filter(Boolean).join(' · '))}</span></td>
+      <td class="siret-cell"><span class="siret-wrap"><input class="input siret-in" data-siret-for="${attr(x.id)}" data-keep="siret-${attr(x.id)}" value="${attr(x.siret)}" inputmode="numeric" autocomplete="off" placeholder="14 chiffres" aria-label="SIRET de ${attr(x.name)}">${done ? `<span class="siret-ok" aria-label="enregistré">${icon('check', 15)}</span>` : ''}</span></td>
+      <td>${badge(x.situation, tone(x.situation))}</td>
+      <td class="num">${esc(fmt.eurc(x.billed))}</td>
+    </tr>`;
+  }).join('');
   return list.map(x => {
     const conv = attachmentIds(x.convention).length > 0;
     const avis = attachmentIds(x.avis).length > 0;
-    return `<tr data-open="${attr(x.id)}" tabindex="0">
+    return `<tr data-open="${attr(x.id)}" tabindex="0"${sel.has(x.id) ? ' class="is-picked"' : ''}>
+      ${checkbox(x)}
       <td><span class="strong">${esc(x.name)}</span><span class="sub">${esc(x.activity)}${x.siret ? ` · ${esc(x.siret)}` : ''}</span></td>
       <td>${badge(x.situation, tone(x.situation))}</td>
       <td class="num">${esc(fmt.eurc(x.billed))}</td>
@@ -59,12 +86,27 @@ function tableRows(list) {
   }).join('');
 }
 
+/* Barre d'actions en série, en bas de l'écran tant qu'une ligne est cochée. */
+function bulkBar() {
+  const opts = M.RS_SITUATIONS.map(s => s.key);
+  return `<div class="bulk" data-bulk role="region" aria-label="Actions sur la sélection"${sel.size ? ' data-show' : ''}>
+    <span class="bulk-count"><b data-bulk-n>${sel.size}</b> <span data-bulk-l>${sel.size > 1 ? 'dossiers sélectionnés' : 'dossier sélectionné'}</span></span>
+    <span class="bulk-sep" aria-hidden="true"></span>
+    <label class="bulk-field"><span>Passer en</span>${select('bulk-sit', opts, 'Pas encore titré', 'data-bulk-sit aria-label="Nouvelle situation"')}</label>
+    <button class="btn btn-primary btn-sm" data-bulk-apply>${icon('check', 15)}Appliquer</button>
+    <button class="icon-btn bulk-x" data-bulk-clear aria-label="Tout désélectionner" data-tip="Tout désélectionner">${icon('x', 16)}</button>
+  </div>`;
+}
+
 export function render({year, params, sub}) {
   readParams(params);
+  if (selYear !== year) { sel.clear(); selYear = year; }
   const data = M.rsYear(year);
   const list = filtered(data);
   const sit = ['Sans suivi', ...M.RS_SITUATIONS.map(s => s.key)].filter(s => data.counts[s]);
   const sum = k => list.reduce((s, x) => s + (x.situation === 'Non concernée' ? 0 : (x[k] || 0)), 0);
+  const missingSiret = data.list.filter(x => !x.siret && !x.siren).length;
+  const doneCount = siretDone.size;
   return `
   <section class="ph">
     <div>
@@ -92,19 +134,26 @@ export function render({year, params, sub}) {
       <select data-f="activity" aria-label="Activité"><option value="">Toutes activités</option>${ACTIVITIES.map(a => `<option${a === f.activity ? ' selected' : ''}>${esc(a)}</option>`).join('')}</select>
       <select data-f="sort" aria-label="Trier">${SORTS.map(([v, l]) => `<option value="${v}"${v === f.sort ? ' selected' : ''}>Tri : ${esc(l)}</option>`).join('')}</select>
       <span class="toolbar-gap"></span>
+      ${!quick() && missingSiret ? `<a class="btn btn-sm" href="#/redevance?siret=0">${icon('edit', 14)}Compléter les SIRET <span class="chip-n">${missingSiret}</span></a>` : ''}
       <span class="muted result-count">${list.length} / ${data.list.length}</span>
     </div>
     <div class="chips-row" role="group" aria-label="Situation">
       <button class="chip" aria-pressed="${!f.situation}" data-sit="">Toutes <span class="chip-n">${data.list.length}</span></button>
       ${sit.map(s => `<button class="chip" aria-pressed="${f.situation === s}" data-sit="${attr(s)}"><span class="chip-dot tone-${tone(s)}"></span>${esc(s)} <span class="chip-n">${data.counts[s]}</span></button>`).join('')}
-      ${f.siret === '0' ? `<button class="chip" aria-pressed="true" data-siret>Sans SIRET ${icon('x', 12)}</button>` : ''}
+      ${quick() ? `<button class="chip" aria-pressed="true" data-siret>Sans SIRET ${icon('x', 12)}</button>` : ''}
     </div>
+    ${quick() ? `<div class="quick-note">
+      <span class="quick-ic">${icon('edit', 16)}</span>
+      <span class="row-main"><b>Saisie rapide des SIRET</b><span>Tapez les 14 chiffres puis <kbd class="kbd-l">Entrée</kbd> : le numéro est enregistré dans Grist et le curseur passe à l’entreprise suivante. <kbd class="kbd-l">Échap</kbd> annule la saisie en cours.</span></span>
+      <span class="quick-progress"><b class="num">${doneCount}</b> <span>saisi(s) · ${missingSiret} restant(s)</span><span class="bar"><span style="width:${Math.round(doneCount / Math.max(1, doneCount + missingSiret) * 100)}%"></span></span></span>
+    </div>` : ''}
     <div class="table-wrap"><table class="t rs-table">
-      <thead><tr><th>Entreprise</th><th>Situation ${year}</th><th class="num">Facturé</th><th class="num">Réglé</th><th class="num">Reste</th><th>N° titre</th><th>Pièces</th></tr></thead>
+      <thead>${headRow(year)}</thead>
       <tbody data-rs-body>${tableRows(list)}</tbody>
-      <tfoot><tr><td>Total de la sélection</td><td></td><td class="num" data-sum="billed">${esc(fmt.eurc(sum('billed')))}</td><td class="num" data-sum="paid">${esc(fmt.eurc(sum('paid')))}</td><td class="num" data-sum="rest">${esc(fmt.eurc(sum('rest')))}</td><td></td><td></td></tr></tfoot>
+      ${quick() ? '' : `<tfoot><tr><td></td><td>Total de la liste</td><td></td><td class="num" data-sum="billed">${esc(fmt.eurc(sum('billed')))}</td><td class="num" data-sum="paid">${esc(fmt.eurc(sum('paid')))}</td><td class="num" data-sum="rest">${esc(fmt.eurc(sum('rest')))}</td><td></td><td></td></tr></tfoot>`}
     </table></div>
-  </article>`;
+  </article>
+  ${bulkBar()}`;
 }
 
 /* ── Fiche entreprise ───────────────────────────────────────────────── */
@@ -275,8 +324,96 @@ function newCompany(year) {
   });
 }
 
+function luhnOK(d) {
+  let s = 0;
+  for (let i = 0; i < d.length; i++) { let n = Number(d[d.length - 1 - i]); if (i % 2) { n *= 2; if (n > 9) n -= 9; } s += n; }
+  return s % 10 === 0;
+}
+
+async function saveSiret(input) {
+  const id = input.dataset.siretFor;
+  const x = M.companies().find(c => c.id === id);
+  if (!x) return;
+  const d = input.value.replace(/\D/g, '');
+  if (!d) return;
+  if (d.length !== 14) {
+    if (input.dataset.err === d) return;
+    input.dataset.err = d;
+    input.setAttribute('aria-invalid', 'true');
+    toast(`SIRET de ${x.name} : 14 chiffres attendus (${d.length} saisis)`, 'error');
+    return;
+  }
+  input.removeAttribute('aria-invalid');
+  const formatted = `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)} ${d.slice(9, 12)} ${d.slice(12)}`;
+  delete input.dataset.err;
+  if (formatted === x.siret || siretDone.get(id) === formatted) return;
+  /* La Poste a des SIRET hors clé de Luhn : on prévient, on n'empêche pas. */
+  if (!luhnOK(d) && !d.startsWith('356000000')) toast(`Clé de contrôle inhabituelle pour ${x.name} : vérifiez le numéro (enregistré)`, 'info', {timeout: 6000});
+  const twin = M.companies().find(c => c.id !== id && c.siret.replace(/\D/g, '') === d);
+  if (twin) toast(`Ce SIRET est déjà celui de ${twin.name}`, 'info', {timeout: 6000});
+  siretDone.set(id, formatted);
+  try {
+    await act([['UpdateRecord', 'Entreprises_RS', x.rowId, fieldsFor('Entreprises_RS', {
+      SIRET: formatted, SIREN: x.siren ? undefined : `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)}`, Derniere_MAJ: M.nowSeconds(),
+    })]]);
+    flash(document.querySelector(`tr[data-open="${CSS.escape(id)}"]`));
+  } catch (err) { siretDone.delete(id); toast(err.message, 'error'); }
+}
+
+async function applyBulk(year, situation) {
+  const targets = M.rsYear(year).list.filter(x => sel.has(x.id));
+  if (!targets.length) return;
+  const n = targets.length;
+  const solde = situation === 'Soldée';
+  const ok = await confirmDialog({
+    title: `Passer ${n} dossier${n > 1 ? 's' : ''} en « ${situation} » ?`,
+    message: `Situation ${year} de ${n > 3 ? `${targets.slice(0, 3).map(x => x.name).join(', ')} et ${n - 3} autre(s)` : targets.map(x => x.name).join(', ')}.${solde ? ' Le montant réglé sera égal au montant facturé et le reste à recouvrer mis à zéro.' : ''} Vous pourrez annuler juste après.`,
+    confirm: 'Appliquer',
+  });
+  if (!ok) return;
+  const now = M.nowSeconds();
+  const undo = [];
+  const actions = targets.map(x => {
+    const fields = {Situation: situation, Derniere_MAJ: now};
+    if (solde && x.billed !== null) { fields.Montant_Regle = x.billed; fields.Reste_A_Recouvrer = 0; }
+    if (x.annual) {
+      const prev = {Situation: x.annual.Situation ?? null, Derniere_MAJ: x.annual.Derniere_MAJ ?? null};
+      if ('Montant_Regle' in fields) { prev.Montant_Regle = x.annual.Montant_Regle ?? null; prev.Reste_A_Recouvrer = x.annual.Reste_A_Recouvrer ?? null; }
+      undo.push(['UpdateRecord', 'Suivi_RS_Annuel', x.annual.id, fieldsFor('Suivi_RS_Annuel', prev)]);
+      return ['UpdateRecord', 'Suivi_RS_Annuel', x.annual.id, fieldsFor('Suivi_RS_Annuel', fields)];
+    }
+    return ['AddRecord', 'Suivi_RS_Annuel', null, {...fieldsFor('Suivi_RS_Annuel', {Suivi_ID: `RS-${x.id}-${year}`, Entreprise_ID: x.id, Exercice: year}), ...fieldsFor('Suivi_RS_Annuel', fields)}];
+  });
+  try {
+    const ret = await act(actions);
+    actions.forEach((a, i) => { if (a[0] === 'AddRecord' && Number.isInteger(ret[i])) undo.push(['RemoveRecord', 'Suivi_RS_Annuel', ret[i]]); });
+    const ids = targets.map(x => x.id);
+    sel.clear();
+    rerender({keepScroll: true});
+    ids.slice(0, 60).forEach(id => flash(document.querySelector(`tr[data-open="${CSS.escape(id)}"]`)));
+    toast(`${n} dossier${n > 1 ? 's' : ''} passé${n > 1 ? 's' : ''} en « ${situation} »`, 'ok', {
+      action: 'Annuler', timeout: 9000,
+      onAction: async () => {
+        try { await act(undo); toast('Modification annulée', 'info'); } catch (err) { toast(err.message, 'error'); }
+      },
+    });
+  } catch (err) { toast(err.message, 'error'); }
+}
+
 export function mount(root, {year, sub}) {
   const body = root.querySelector('[data-rs-body]');
+  const bar = root.querySelector('[data-bulk]');
+  /* Met à jour cases, lignes et barre sans redessiner la page. */
+  const syncSel = () => {
+    const boxes = [...body.querySelectorAll('[data-sel]')];
+    const on = boxes.filter(b => b.checked).length;
+    const all = root.querySelector('[data-sel-all]');
+    if (all) { all.checked = boxes.length > 0 && on === boxes.length; all.indeterminate = on > 0 && on < boxes.length; }
+    boxes.forEach(b => b.closest('tr').classList.toggle('is-picked', b.checked));
+    bar.querySelector('[data-bulk-n]').textContent = sel.size;
+    bar.querySelector('[data-bulk-l]').textContent = sel.size > 1 ? 'dossiers sélectionnés' : 'dossier sélectionné';
+    bar.toggleAttribute('data-show', sel.size > 0);
+  };
   const refreshList = (fade = false) => {
     const data = M.rsYear(year);
     const list = filtered(data);
@@ -285,12 +422,30 @@ export function mount(root, {year, sub}) {
     if (fade) body.animate([{opacity: .3}, {opacity: 1}], {duration: 180, easing: 'ease-out'});
     root.querySelector('.result-count').textContent = `${list.length} / ${data.list.length}`;
     const sum = k => list.reduce((s, x) => s + (x.situation === 'Non concernée' ? 0 : (x[k] || 0)), 0);
-    for (const k of ['billed', 'paid', 'rest']) root.querySelector(`[data-sum="${k}"]`).textContent = fmt.eurc(sum(k));
+    for (const k of ['billed', 'paid', 'rest']) { const c = root.querySelector(`[data-sum="${k}"]`); if (c) c.textContent = fmt.eurc(sum(k)); }
     writeParams(drawerOpen() ? drawerId() : '');
+    syncSel();
   };
   root.querySelector('.search-field input').addEventListener('input', e => { f.q = e.target.value; refreshList(); });
   root.querySelectorAll('[data-f]').forEach(s => s.addEventListener('change', e => { f[s.dataset.f] = e.target.value; refreshList(true); }));
+  root.addEventListener('change', e => {
+    const box = e.target.closest('[data-sel]');
+    if (box) { box.checked ? sel.add(box.dataset.sel) : sel.delete(box.dataset.sel); syncSel(); return; }
+    if (e.target.matches('[data-sel-all]')) {
+      for (const b of body.querySelectorAll('[data-sel]')) { b.checked = e.target.checked; b.checked ? sel.add(b.dataset.sel) : sel.delete(b.dataset.sel); }
+      syncSel();
+      return;
+    }
+  });
   root.addEventListener('click', e => {
+    if (e.target.closest('.sel-cell, .siret-cell')) {
+      /* Un clic dans la cellule (pas seulement sur la case) coche la ligne. */
+      const cell = e.target.closest('.sel-cell');
+      if (cell && !e.target.matches('input')) cell.querySelector('input')?.click();
+      return;
+    }
+    if (e.target.closest('[data-bulk-clear]')) { sel.clear(); body.querySelectorAll('[data-sel]').forEach(b => { b.checked = false; }); syncSel(); return; }
+    if (e.target.closest('[data-bulk-apply]')) { applyBulk(year, bar.querySelector('[data-bulk-sit]').value); return; }
     const chip = e.target.closest('[data-sit]');
     if (chip) {
       f.situation = chip.dataset.sit;
@@ -299,7 +454,7 @@ export function mount(root, {year, sub}) {
       if (chip.classList.contains('kpi-btn')) root.querySelector('.rs-table').scrollIntoView({behavior: 'smooth', block: 'start'});
       return;
     }
-    if (e.target.closest('[data-siret]')) { f.siret = ''; e.target.closest('[data-siret]').remove(); refreshList(); return; }
+    if (e.target.closest('[data-siret]')) { f.siret = ''; siretDone.clear(); writeParams(); rerender({keepScroll: true}); return; }
     if (e.target.closest('[data-reset]')) { Object.assign(f, {q: '', situation: '', activity: '', siret: ''}); writeParams(); rerender({keepScroll: true}); return; }
     const tr = e.target.closest('tr[data-open]');
     if (tr) { writeParams(tr.dataset.open); openFiche(tr.dataset.open, year); return; }
@@ -310,9 +465,24 @@ export function mount(root, {year, sub}) {
         list.map(x => [x.name, x.siret, x.activity, x.situation, x.billed, x.paid, x.rest, x.titleNumber, x.email, x.phone]));
     }
   });
+  body.addEventListener('focusout', e => { if (e.target.matches?.('.siret-in')) saveSiret(e.target); });
   body.addEventListener('keydown', e => {
+    const inp = e.target.closest('.siret-in');
+    if (inp) {
+      if (e.key === 'Enter' || (e.key === 'ArrowDown') || (e.key === 'ArrowUp')) {
+        e.preventDefault();
+        const all = [...body.querySelectorAll('.siret-in')];
+        const next = all[all.indexOf(inp) + (e.key === 'ArrowUp' ? -1 : 1)];
+        /* Le focus part d'abord sur la ligne suivante : l'enregistrement
+           (déclenché par « change ») redessine la page en gardant ce focus. */
+        if (next) { next.focus(); next.select(); } else inp.blur();
+      } else if (e.key === 'Escape') { e.stopPropagation(); inp.value = inp.defaultValue; inp.removeAttribute('aria-invalid'); }
+      return;
+    }
+    if (e.target.matches('input')) return;
     const tr = e.target.closest('tr[data-open]');
     if (tr && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); writeParams(tr.dataset.open); openFiche(tr.dataset.open, year); }
   });
+  syncSel();
   if (sub && !(drawerOpen() && drawerId() === sub)) openFiche(sub, year);
 }
