@@ -3,6 +3,7 @@ import { rows, act, fieldsFor } from '../grist.js';
 import { esc, attr, icon, fmt, badge, empty, openDrawer, closeDrawer, toast, field, select, formData, confirmDialog, downloadCsv, flash, motionOK } from '../ui.js';
 import { statusBars, deltaBars, spark, mountChart } from '../charts.js';
 import { author, render as rerender } from '../main.js';
+import { openImport, terrainStats } from './cfe-import.js';
 
 const STATUS = ['Définitif', 'Notifié', 'Renseigné', 'Prévision'];
 const statusTone = s => ({'Définitif': 'good', 'Notifié': 'good', 'Renseigné': 'info', 'Prévision': 'warn'}[s] || 'neutral');
@@ -232,20 +233,64 @@ function detail({year, params}, t) {
   ${t.code === 'VM' ? `<div id="employeurs" class="mt-l"><p class="section-title">Employeurs</p>${employeurs()}</div>` : ''}`;
 }
 
+/* ── Suivi terrain CFE ──────────────────────────────────────────────
+   Avec des établissements importés, tout est calculé à partir de la table ;
+   sinon, la synthèse de l'ancien outil reste affichée telle quelle. */
+const TERRAIN_STATUS = ['Exploité', 'Vacant', 'À revoir', 'Fermé', 'Non visité'];
+const terrainTone = s => /exploit|occup|actif/i.test(s) ? 'good' : /vacant|vide|libre/i.test(s) ? 'warn' : /revoir|v[ée]rifier|doute/i.test(s) ? 'critical' : /ferm/i.test(s) ? 'neutral' : 'info';
+const tf = {q: '', st: '', commune: ''};
+const tnorm = s => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+function terrainRows() {
+  const words = tnorm(tf.q).split(/\s+/).filter(Boolean);
+  return rows('Etablissements_CFE').filter(e =>
+    (!tf.st || (M.text(e.Statut_Terrain) || 'Non visité') === tf.st) &&
+    (!tf.commune || M.text(e.Commune) === tf.commune) &&
+    (!words.length || words.every(w => tnorm(`${e.Raison_Sociale} ${e.SIRET} ${e.Adresse} ${e.Parcelle} ${e.Section} ${e.Binome}`).includes(w))));
+}
+
+function terrainBody(list) {
+  if (!list.length) return `<tr><td colspan="7">${empty('Aucun établissement', 'Modifiez la recherche ou les filtres.')}</td></tr>`;
+  const statuses = [...new Set([...TERRAIN_STATUS, ...rows('Etablissements_CFE').map(e => M.text(e.Statut_Terrain)).filter(Boolean)])];
+  return list.slice(0, 400).map(e => {
+    const st = M.text(e.Statut_Terrain) || 'Non visité';
+    const cad = [M.text(e.Section), M.text(e.Parcelle)].filter(Boolean).join(' ');
+    return `<tr data-etab="${e.id}">
+      <td><span class="strong">${esc(M.text(e.Raison_Sociale) || 'Sans nom')}</span><span class="sub">${esc([M.text(e.SIRET), M.text(e.Nature_Local) || M.text(e.Affectation)].filter(Boolean).join(' · '))}</span></td>
+      <td>${esc(M.text(e.Adresse))}<span class="sub">${esc([M.text(e.Commune), cad && `cad. ${cad}`].filter(Boolean).join(' · '))}</span></td>
+      <td class="num">${M.num(e.Base_Nette) !== null ? esc(fmt.eur(M.num(e.Base_Nette))) : M.num(e.Valeur_Locative) !== null ? `<span class="muted">VL ${esc(fmt.eur(M.num(e.Valeur_Locative)))}</span>` : '<span class="miss">—</span>'}</td>
+      <td class="num">${M.num(e.Produit_Theorique) !== null ? esc(fmt.eur(M.num(e.Produit_Theorique))) : '<span class="miss">—</span>'}</td>
+      <td>${esc(M.text(e.Binome))}<span class="sub">${e.Derniere_Visite ? esc(String(e.Derniere_Visite).slice(0, 10)) : ''}</span></td>
+      <td><label class="plan-status"><span class="sr">Statut terrain</span>${select('st', statuses, st, `data-etab-st="${e.id}" class="status-select tone-${terrainTone(st)}"`)}</label></td>
+    </tr>`;
+  }).join('') + (list.length > 400 ? `<tr><td colspan="7" class="muted">${list.length - 400} ligne(s) de plus : affinez la recherche.</td></tr>` : '');
+}
+
 function terrain() {
   const s = rows('CFE_Synthese')[0];
   const etabs = rows('Etablissements_CFE');
-  if (!s && !etabs.length) return `<article class="card">${empty('Aucun suivi terrain', 'Importez les établissements dans la table Etablissements_CFE.')}</article>`;
+  const importBtn = `<button class="btn ${etabs.length ? '' : 'btn-primary'}" data-cfe-import>${icon('upload', 15)}${etabs.length ? 'Réimporter / compléter' : 'Importer le fichier terrain'}</button>`;
+  if (!s && !etabs.length) return `<article class="card">${empty('Aucun suivi terrain', 'Importez le fichier Excel ou CSV de la campagne de visites.', importBtn)}</article>`;
+  const live = etabs.length > 0;
+  const st = live ? terrainStats() : null;
   const v = k => M.num(s?.[k]) ?? 0;
-  const total = M.num(s?.Nombre_Lignes) || etabs.length;
-  const parts = [['Exploités', v('Exploites'), 'var(--good)'], ['Vacants', v('Vacants'), 'var(--warn)'], ['À revoir', v('A_Revoir'), 'var(--critical)']];
+  const total = live ? st.total : (M.num(s?.Nombre_Lignes) || 0);
+  const visits = live ? st.visites : v('Visites');
+  const parts = live
+    ? [['Exploités', st.exploites, 'var(--good)'], ['Vacants', st.vacants, 'var(--warn)'], ['À revoir', st.revoir, 'var(--critical)'], ['Autres ou non visités', Math.max(0, st.total - st.exploites - st.vacants - st.revoir), 'var(--line-2)']]
+    : [['Exploités', v('Exploites'), 'var(--good)'], ['Vacants', v('Vacants'), 'var(--warn)'], ['À revoir', v('A_Revoir'), 'var(--critical)']];
+  const communes = [...new Set(etabs.map(e => M.text(e.Commune)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+  const produit = etabs.reduce((a, e) => a + (M.num(e.Produit_Theorique) || 0), 0);
+  const counts = {};
+  for (const e of etabs) { const k = M.text(e.Statut_Terrain) || 'Non visité'; counts[k] = (counts[k] || 0) + 1; }
+  const list = live ? terrainRows() : [];
   return `<section class="grid g-main">
     <article class="card card-pad">
-      <p class="card-eyebrow">Campagne de visites</p><h2 class="card-title">${esc(M.text(s?.Nom_Fichier) || 'Synthèse')}</h2>
-      <p class="card-sub">${s?.Importe_Le ? `Importé le ${esc(fmt.date(M.toDate(s.Importe_Le)))}` : ''}</p>
+      <div class="card-head" style="padding:0"><div><p class="card-eyebrow">Campagne de visites</p><h2 class="card-title">${esc(M.text(s?.Nom_Fichier) || 'Établissements suivis')}</h2>
+        <p class="card-sub">${live ? 'Calculé à partir de la table Etablissements_CFE' : 'Synthèse reprise de l’ancien outil'}${s?.Importe_Le ? ` · importé le ${esc(fmt.date(M.toDate(s.Importe_Le)))}` : ''}</p></div>${importBtn}</div>
       <div class="grid g-4 mt">
         <div><p class="kpi-label">Locaux suivis</p><p class="kpi-value">${total}</p></div>
-        <div><p class="kpi-label">Visités</p><p class="kpi-value">${v('Visites')}</p><p class="kpi-meta">${esc(fmt.pct(total ? v('Visites') / total : null))}</p></div>
+        <div><p class="kpi-label">Visités</p><p class="kpi-value">${visits}</p><p class="kpi-meta">${esc(fmt.pct(total ? visits / total : null))}</p></div>
         ${parts.slice(0, 2).map(([l, n]) => `<div><p class="kpi-label">${l}</p><p class="kpi-value">${n}</p></div>`).join('')}
       </div>
       <p class="kpi-label mt">Résultat des visites</p>
@@ -253,8 +298,25 @@ function terrain() {
       <div class="legend mt">${parts.map(([l, n, c]) => `<span><span class="sw" style="background:${c}"></span>${l} · ${n}</span>`).join('')}</div>
     </article>
     <article class="card card-pad"><p class="card-eyebrow">Référentiel</p><h2 class="card-title">Établissements</h2>
-      <p class="card-sub" style="margin-top:6px">${etabs.length ? `${etabs.length} ligne(s) dans Etablissements_CFE` : 'La table Etablissements_CFE est vide : seule la synthèse de l’ancien outil est disponible.'}</p></article>
-  </section>`;
+      ${live ? `<p class="kpi-value mt">${esc(fmt.short(produit))}</p><p class="kpi-meta">de produit théorique sur ${etabs.length} établissement(s)${communes.length ? ` · ${communes.length} commune(s)` : ''}</p>`
+      : '<p class="card-sub" style="margin-top:6px">La table Etablissements_CFE est vide : importez le fichier de la campagne pour suivre chaque local, son statut et son produit.</p>'}
+    </article>
+  </section>
+  ${live ? `<article class="card mt">
+    <div class="toolbar card-toolbar">
+      <label class="search-field">${icon('search', 16)}<input class="input" type="search" placeholder="Raison sociale, SIRET, adresse, parcelle…" value="${attr(tf.q)}" data-keep="cfe-q" data-cfe-q aria-label="Rechercher un établissement"></label>
+      ${communes.length > 1 ? `<select data-cfe-commune aria-label="Commune"><option value="">Toutes communes</option>${communes.map(c => `<option${c === tf.commune ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>` : ''}
+      <span class="toolbar-gap"></span><span class="muted result-count" data-cfe-count>${list.length} / ${etabs.length}</span>
+    </div>
+    <div class="chips-row" role="group" aria-label="Statut terrain">
+      <button class="chip" aria-pressed="${!tf.st}" data-cfe-st="">Tous <span class="chip-n">${etabs.length}</span></button>
+      ${Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([k, n]) => `<button class="chip" aria-pressed="${tf.st === k}" data-cfe-st="${attr(k)}"><span class="chip-dot tone-${terrainTone(k)}"></span>${esc(k)} <span class="chip-n">${n}</span></button>`).join('')}
+    </div>
+    <div class="table-wrap"><table class="t cfe-table">
+      <thead><tr><th>Établissement</th><th>Adresse</th><th class="num">Base nette</th><th class="num">Produit théorique</th><th>Visite</th><th>Statut terrain</th></tr></thead>
+      <tbody data-cfe-body>${terrainBody(list)}</tbody>
+    </table></div>
+  </article>` : ''}`;
 }
 
 function employeurs() {
@@ -338,6 +400,34 @@ export function mount(root, {year, sub, params}) {
       hist.slice(1).map(h => ({year: h.year, delta: h.delta})), {width: w, height: 280, active: sel}));
     const target = params.get('tab');
     if (target && !document.body.classList.contains('no-enter')) root.querySelector(`#${CSS.escape(target)}`)?.scrollIntoView({block: 'start'});
+  }
+  if (code === 'CFE') {
+    const cbody = root.querySelector('[data-cfe-body]');
+    const credraw = fade => {
+      if (!cbody) return;
+      const list = terrainRows();
+      cbody.innerHTML = terrainBody(list);
+      if (fade) cbody.animate([{opacity: .3}, {opacity: 1}], {duration: 180, easing: 'ease-out'});
+      root.querySelector('[data-cfe-count]').textContent = `${list.length} / ${rows('Etablissements_CFE').length}`;
+    };
+    root.querySelector('[data-cfe-q]')?.addEventListener('input', e => { tf.q = e.target.value; credraw(); });
+    root.querySelector('[data-cfe-commune]')?.addEventListener('change', e => { tf.commune = e.target.value; credraw(true); });
+    root.addEventListener('click', e => {
+      if (e.target.closest('[data-cfe-import]')) { openImport(); return; }
+      const chip = e.target.closest('[data-cfe-st]');
+      if (chip) { tf.st = chip.dataset.cfeSt; root.querySelectorAll('[data-cfe-st]').forEach(b => b.setAttribute('aria-pressed', b === chip)); credraw(true); }
+    });
+    root.addEventListener('change', async e => {
+      const s = e.target.closest('[data-etab-st]');
+      if (!s) return;
+      const id = Number(s.dataset.etabSt);
+      s.className = `status-select tone-${terrainTone(s.value)}`;
+      try {
+        await act([['UpdateRecord', 'Etablissements_CFE', id, fieldsFor('Etablissements_CFE', {Statut_Terrain: s.value, Derniere_Visite: new Date().toISOString().slice(0, 10)})]]);
+        toast(`Statut : ${s.value}`);
+        flash(document.querySelector(`tr[data-etab="${id}"]`));
+      } catch (err) { toast(err.message, 'error'); }
+    });
   }
   root.addEventListener('click', async e => {
     const pk = e.target.closest('[data-pick]');

@@ -255,3 +255,24 @@ body.no-enter .siret-ok { animation: none; }
 .kpi-stage .kpi-label .chip-dot { display: inline-block; }
 .table-wrap.mini tr.is-out td { color: var(--ink-3); }
 .table-wrap.mini tr.is-out .badge { opacity: .6; }
+
+/* ── Import du suivi terrain CFE ──────────────────────────────────── */
+.import-drop { display: grid; justify-items: center; text-align: center; gap: 10px; padding: 36px 24px; border-radius: 16px; outline: 1.5px dashed var(--line-2); outline-offset: -1.5px; background: var(--surface-2); transition: background-color 150ms ease, outline-color 150ms ease; }
+.import-drop[data-over] { background: var(--accent-soft); outline-color: var(--accent); }
+.import-drop span:not(.import-ic) { color: var(--ink-2); font-size: 13px; max-width: 52ch; }
+.import-ic { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: var(--accent-soft); color: var(--accent); }
+.import-file { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; box-shadow: 0 0 0 1px var(--line); flex-wrap: wrap; }
+.import-file > .ic { color: var(--accent); }
+.import-file select { height: 32px; border-radius: 8px; border: 0; box-shadow: inset 0 0 0 1px var(--line-2); background: var(--surface); padding: 0 10px; }
+.map-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; }
+.map-row { display: grid; grid-template-columns: 140px minmax(0, 1fr); align-items: center; gap: 10px; font-size: 13px; color: var(--ink-3); }
+.map-row.on { color: var(--ink); font-weight: 500; }
+.map-row select { height: 32px; border-radius: 8px; border: 0; box-shadow: inset 0 0 0 1px var(--line); background: var(--surface); padding: 0 8px; font-size: 12.5px; min-width: 0; color: var(--ink-3); }
+.map-row.on select { box-shadow: inset 0 0 0 1.5px var(--accent); color: var(--ink); }
+.import-prev td, .import-prev th { white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.import-plan { display: flex; gap: 20px; flex-wrap: wrap; padding: 12px 14px; border-radius: 12px; background: var(--accent-soft); font-size: 13px; }
+.import-plan b { font-family: var(--serif); font-size: 20px; font-weight: 500; margin-right: 4px; }
+.cfe-table .plan-status { display: block; min-width: 140px; }
+@media (max-width: 640px) { .map-grid { grid-template-columns: minmax(0, 1fr); } .map-row { grid-template-columns: 110px minmax(0, 1fr); } }
+.status-select.tone-critical { background-color: var(--critical-bg); color: var(--critical); }
+.status-select.tone-serious { background-color: var(--serious-bg); color: var(--serious); }
