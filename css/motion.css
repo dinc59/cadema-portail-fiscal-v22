@@ -10,7 +10,7 @@
    - Seuls transform et opacity sont animés (hors pastille d'onglets). */
 
 :root { --flash: rgba(12, 107, 109, .16); }
-:root[data-theme="dark"] { --flash: rgba(63, 182, 176, .22); }
+:root[data-theme="dark"], :root[data-theme="dim"] { --flash: rgba(63, 182, 176, .22); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --flash: rgba(63, 182, 176, .22); } }
 
 /* ── Fiche d'une recette ─────────────────────────────────────────── */
@@ -137,3 +137,29 @@ body:not(.no-enter) .ring-val { animation: ring-draw 760ms var(--ease-out) both 
   .tabs-pill { transition: none; }
   body.soft-enter .page > *:not(.ph):not(.toolbar):not(.crumb) { animation: fadein 200ms ease both; }
 }
+
+/* ── Fond « Tamisé » : un sombre adouci, plus clair que « Sombre » ─── */
+:root[data-theme="dim"] {
+  --bg: #1a2228; --surface: #232d34; --surface-2: #28333b; --sunk: #1d262c;
+  --line: #34424b; --line-2: #46565f;
+  --ink-3: #96a3aa;
+  --accent-soft: #1c3b3a;
+  --top: #121a1f; --top-2: #1b262d; --top-3: #26343d;
+  --good-bg: #1a3527; --warn-bg: #372c16; --serious-bg: #3c2714;
+  --critical-bg: #3e1e1b; --info-bg: #1e2c46; --neutral-bg: #2b353c;
+}
+
+/* ── Choix du fond ─────────────────────────────────────────────────── */
+.theme-menu { width: 268px; }
+.theme-item > span:first-of-type { flex: none; }
+.theme-txt { flex: 1; display: grid; line-height: 1.3; }
+.theme-txt b { font-weight: 500; font-size: 13.5px; }
+.theme-item[aria-checked="true"] .theme-txt b { font-weight: 600; }
+.theme-check { opacity: 0; color: var(--accent); }
+.theme-item[aria-checked="true"] .theme-check { opacity: 1; }
+.theme-sw { display: grid; place-items: center; width: 36px; height: 26px; border-radius: 7px; box-shadow: inset 0 0 0 1px var(--line-2); }
+.theme-sw i { width: 18px; height: 10px; border-radius: 3px; }
+.theme-sw-light { background: #f3f2ed; } .theme-sw-light i { background: #fff; box-shadow: 0 0 0 1px #e3e0d6; }
+.theme-sw-dim { background: #1a2228; } .theme-sw-dim i { background: #2f3b44; }
+.theme-sw-dark { background: #0e1417; } .theme-sw-dark i { background: #1e282e; }
+.theme-sw-auto { background: linear-gradient(105deg, #f3f2ed 50%, #0e1417 50%); } .theme-sw-auto i { background: linear-gradient(105deg, #fff 50%, #1e282e 50%); }

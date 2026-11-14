@@ -58,7 +58,7 @@
   --page-w: 1320px;
 }
 
-:root[data-theme="dark"] {
+:root[data-theme="dark"], :root[data-theme="dim"] {
   color-scheme: dark;
   --bg: #0e1417; --surface: #151c20; --surface-2: #192126; --sunk: #11181b;
   --line: #253038; --line-2: #33414a;
@@ -514,7 +514,7 @@ body.has-overlay { overflow: hidden; }
 
 /* Avatar */
 .avatar { display: inline-grid; place-items: center; border-radius: 50%; flex: none; font-weight: 600; letter-spacing: .02em; color: hsl(var(--h) 45% 22%); background: hsl(var(--h) 55% 86%); }
-:root[data-theme="dark"] .avatar { color: hsl(var(--h) 60% 88%); background: hsl(var(--h) 30% 28%); }
+:root[data-theme="dark"] .avatar, :root[data-theme="dim"] .avatar { color: hsl(var(--h) 60% 88%); background: hsl(var(--h) 30% 28%); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .avatar { color: hsl(var(--h) 60% 88%); background: hsl(var(--h) 30% 28%); } }
 
 /* Pied */

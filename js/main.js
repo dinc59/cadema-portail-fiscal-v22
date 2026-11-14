@@ -37,6 +37,24 @@ const NAV = [
 ];
 const PAGES = {accueil, recettes, redevance, finances, pilotage, documents, equipe};
 
+/* Fonds disponibles. « Tamisé » est un sombre adouci, plus clair que « Sombre ». */
+const THEMES = [
+  ['auto', 'Automatique', 'Suit le réglage de l’appareil', 'present'],
+  ['light', 'Clair', 'Papier clair, en-tête sombre', 'sun'],
+  ['dim', 'Tamisé', 'Sombre adouci, plus clair', 'half'],
+  ['dark', 'Sombre', 'Fond nuit', 'moon'],
+];
+const themeIcon = () => app.theme === 'auto'
+  ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'moon' : 'sun')
+  : THEMES.find(t => t[0] === app.theme)?.[3] || 'sun';
+function themeMenu() {
+  return `<div class="menu theme-menu" role="menu" aria-label="Fond de l’écran"><p class="menu-label">Fond de l’écran</p>${THEMES.map(([v, l, d]) =>
+    `<button class="menu-item theme-item" role="menuitemradio" aria-checked="${app.theme === v}" data-theme-set="${v}">
+      <span class="theme-sw theme-sw-${v}" aria-hidden="true"><i></i></span>
+      <span class="theme-txt"><b>${l}</b><span class="menu-hint">${d}</span></span>${icon('check', 16, 'theme-check')}
+    </button>`).join('')}</div>`;
+}
+
 /* ── Thème ─────────────────────────────────────────────────────────── */
 function applyTheme() {
   const root = document.documentElement;
@@ -82,6 +100,7 @@ function header() {
         <button class="search-btn" data-palette aria-label="Rechercher (Ctrl K)">
           ${icon('search', 16)}<span class="search-ph">Rechercher</span><kbd>Ctrl K</kbd>
         </button>
+        <button class="top-icon" data-pop="theme" aria-label="Fond de l’écran : clair, tamisé ou sombre" aria-haspopup="menu" aria-expanded="false">${icon(themeIcon(), 18)}</button>
         <button class="top-icon" data-pop="notif" aria-label="Alertes${unread ? ` (${unread})` : ''}" aria-haspopup="dialog" aria-expanded="false">
           ${icon('bell', 18)}${unread ? `<span class="dot-count">${unread}</span>` : ''}
         </button>
@@ -212,11 +231,6 @@ function meMenu() {
     <p class="menu-label">Vous êtes</p>
     <div class="me-people">${ppl.map(p => `<button class="chip${p.name === app.profile ? ' is-on' : ''}" data-profile="${attr(p.name)}">${esc(p.name)}</button>`).join('') || '<span class="muted">Aucun utilisateur dans la table Utilisateurs</span>'}</div>
     <p class="menu-hint-line">Sert à signer vos modifications. La connexion reste gérée par Grist.</p>
-    <div class="menu-sep"></div>
-    <div class="seg-ctl" role="radiogroup" aria-label="Thème">
-      ${[['auto', 'Auto', 'present'], ['light', 'Clair', 'sun'], ['dark', 'Sombre', 'moon']].map(([v, l, i]) =>
-        `<button role="radio" aria-checked="${app.theme === v}" data-theme-set="${v}">${icon(i, 15)}${l}</button>`).join('')}
-    </div>
     <div class="menu-sep"></div>
     <a class="menu-item" href="#/equipe" role="menuitem">${icon('users', 16)}<span>Équipe &amp; paramètres</span></a>
     <button class="menu-item" data-refresh role="menuitem">${icon('refresh', 16)}<span>Actualiser depuis Grist</span><span class="menu-hint">${db.syncedAt ? esc(fmt.rel(db.syncedAt)) : ''}</span></button>
@@ -404,7 +418,7 @@ document.addEventListener('click', e => {
   const p = t.closest('[data-pop]');
   if (p) {
     const kind = p.dataset.pop;
-    const el = openPop(p, kind === 'year' ? yearMenu() : kind === 'notif' ? notifPanel() : meMenu(), {cls: `pop-${kind}`});
+    const el = openPop(p, kind === 'year' ? yearMenu() : kind === 'notif' ? notifPanel() : kind === 'theme' ? themeMenu() : meMenu(), {cls: `pop-${kind}`});
     el?.querySelector('[aria-checked="true"], button, a')?.focus({preventScroll: true});
     return;
   }
@@ -424,7 +438,7 @@ document.addEventListener('click', e => {
   const pr = t.closest('[data-profile]');
   if (pr) { app.profile = pr.dataset.profile; store.set('cadema-v22-profile', app.profile); closePop(); render({keepScroll: true}); toast(`Bonjour ${app.profile}`, 'ok', {timeout: 2200}); return; }
   const th = t.closest('[data-theme-set]');
-  if (th) { app.theme = th.dataset.themeSet; store.set('cadema-v22-theme', app.theme); applyTheme(); pop?.el.querySelectorAll('[data-theme-set]').forEach(b => b.setAttribute('aria-checked', b === th)); return; }
+  if (th) { app.theme = th.dataset.themeSet; store.set('cadema-v22-theme', app.theme); applyTheme(); pop?.el.querySelectorAll('[data-theme-set]').forEach(b => b.setAttribute('aria-checked', b === th)); const tb = root.querySelector('[data-pop="theme"]'); if (tb) tb.innerHTML = icon(themeIcon(), 18); return; }
   if (t.closest('[data-refresh]')) { closePop(); loadAll().then(() => toast('Données relues depuis Grist', 'ok', {timeout: 2000})); return; }
   if (t.closest('[data-burger]')) { const open = document.body.classList.toggle('nav-open'); t.closest('[data-burger]').setAttribute('aria-expanded', open); return; }
   if (pop && !pop.el.contains(t)) closePop();
