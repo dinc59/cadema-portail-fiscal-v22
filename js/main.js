@@ -168,6 +168,9 @@ function notifications() {
   for (const e of M.events().filter(e => e.start && e.start >= new Date(now.toDateString()) && e.start <= soon && e.status !== 'Terminé')) {
     out.push({tone: 'info', title: e.title, text: `Échéance le ${fmt.date(e.start)}${e.owner ? ` · ${e.owner}` : ''}`, href: '#/pilotage?tab=calendrier'});
   }
+  for (const c of M.recovery().list.filter(c => c.due)) {
+    out.push({tone: 'warn', title: `Relance à faire : ${c.name}`, text: `${c.stepLabel} · reste ${fmt.eurc(c.rest)} · prévu le ${fmt.date(c.nextDate)}`, href: `#/redevance?tab=recouvrement&relance=${encodeURIComponent(c.id)}`});
+  }
   for (const t of M.tasks().filter(t => t.due && t.due < now && t.status !== 'Terminé')) {
     out.push({tone: 'warn', title: `En retard : ${t.title}`, text: `Échéance dépassée le ${fmt.date(t.due)}`, href: '#/pilotage'});
   }
@@ -247,6 +250,7 @@ function paletteItems() {
     {kind: 'Page', label: 'Plan d’actions 2026–2029', href: '#/pilotage?tab=plans', ic: 'target'},
     {kind: 'Page', label: 'Calendrier fiscal', href: '#/pilotage?tab=calendrier', ic: 'calendar'},
     {kind: 'Page', label: 'Qualité des données', href: '#/pilotage?tab=qualite', ic: 'shield'},
+    {kind: 'Page', label: 'Recouvrement de la redevance', href: '#/redevance?tab=recouvrement', ic: 'wallet'},
     {kind: 'Page', label: 'Dotations DGF & FPIC', href: '#/finances?tab=dotations', ic: 'landmark'},
     {kind: 'Page', label: 'Équipe & paramètres', href: '#/equipe', ic: 'users'},
     ...M.TAXES.map(t => ({kind: 'Recette', label: `${t.code} · ${t.label}`, href: `#/recettes/${t.code}`, ic: 'coins'})),

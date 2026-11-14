@@ -186,6 +186,40 @@ export function rsYear(year) {
   return {list, billed, paid, rest: Math.max(0, billed - paid), rate: billed ? paid / billed : null, counts, concerned: concerned.length};
 }
 
+/* ── Recouvrement (tous exercices) ────────────────────────────────── */
+/* Étapes du dossier, portées par Entreprises_RS.Etape_Actuelle. */
+export const RS_STEPS = ['À qualifier', 'À titrer', 'Titre émis', 'Relance 1', 'Relance 2', 'Mise en demeure', 'Transmis au comptable', 'Soldé'];
+/* Où en est le dossier, déduit des situations annuelles (pas de l'étape saisie) :
+   un titre émis non réglé se relance ; un montant non titré se titre d'abord. */
+export const RECOVERY_STAGES = [
+  {key: 'À relancer', tone: 'serious', hint: 'Titre émis, reste impayé'},
+  {key: 'À titrer', tone: 'info', hint: 'Facturé mais pas encore titré'},
+  {key: 'À qualifier', tone: 'warn', hint: 'Situation à vérifier'},
+];
+export function recovery() {
+  const today = new Date(new Date().toDateString());
+  const list = companies().map(c => {
+    const years = annualFor(c.id, c.rowId).map(a => {
+      const billed = num(a.Montant_Facture), paid = num(a.Montant_Regle) || 0;
+      return {year: num(a.Exercice), row: a, situation: text(a.Situation) || 'À vérifier', billed, paid,
+        rest: billed ? Math.max(0, billed - paid) : 0, title: text(a.Numero_Titre), titleDate: toDate(a.Date_Titre)};
+    }).filter(y => y.rest > 0 && !/non concern|sold/i.test(y.situation)).sort((a, b) => a.year - b.year);
+    if (!years.length) return null;
+    const stage = years.some(y => /titre [ée]mis|partiel/i.test(y.situation)) ? 'À relancer'
+      : years.some(y => /pas encore titr/i.test(y.situation)) ? 'À titrer' : 'À qualifier';
+    const relances = Number((/relance\s*(\d)/i.exec(c.step) || [])[1] || 0);
+    return {...c, years, rest: years.reduce((s, y) => s + y.rest, 0), oldest: years[0].year, stage, relances,
+      due: !!(c.nextDate && c.nextDate <= today), stepLabel: c.step || 'À qualifier'};
+  }).filter(Boolean).sort((a, b) => b.rest - a.rest);
+  const byYear = {};
+  for (const c of list) for (const y of c.years) byYear[y.year] = (byYear[y.year] || 0) + y.rest;
+  const counts = {}, amounts = {};
+  for (const c of list) { counts[c.stage] = (counts[c.stage] || 0) + 1; amounts[c.stage] = (amounts[c.stage] || 0) + c.rest; }
+  /* « Confirmé » = titré ou facturé et qualifié ; « à vérifier » n'est pas encore une créance sûre. */
+  const confirmed = (amounts['À relancer'] || 0) + (amounts['À titrer'] || 0);
+  return {list, byYear, counts, amounts, confirmed, unsure: amounts['À qualifier'] || 0, rest: list.reduce((s, c) => s + c.rest, 0), due: list.filter(c => c.due).length};
+}
+
 /* ── Pilotage ──────────────────────────────────────────────────────── */
 export const TASK_STATUSES = ['À traiter', 'En cours', 'En attente', 'Terminé'];
 export const PLAN_STATUSES = ['À lancer', 'En cours', 'À sécuriser', 'Réalisé', 'Abandonné'];

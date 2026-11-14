@@ -2,6 +2,12 @@ import * as M from '../model.js';
 import { rows, act, fieldsFor, uploadAttachment, openAttachment, attachmentIds } from '../grist.js';
 import { esc, attr, icon, fmt, badge, empty, openDrawer, patchDrawer, drawerOpen, drawerId, toast, field, select, formData, downloadCsv, flash, confirmDialog } from '../ui.js';
 import { author, render as rerender } from '../main.js';
+import * as reco from './recouvrement.js';
+
+const rsTabs = (tab, year) => `<div class="toolbar"><nav class="tabs" aria-label="Vues">
+    <a href="#/redevance"${tab === 'suivi' ? ' aria-current="page"' : ''}>${icon('list', 15)}Suivi ${year}</a>
+    <a href="#/redevance?tab=recouvrement"${tab === 'recouvrement' ? ' aria-current="page"' : ''}>${icon('wallet', 15)}Recouvrement <span class="count">${M.recovery().list.length}</span></a>
+  </nav></div>`;
 
 const SORTS = [['rest', 'Reste à recouvrer'], ['name', 'Nom (A→Z)'], ['billed', 'Montant facturé'], ['updated', 'Dernière mise à jour']];
 const ACTIVITIES = ['Administration', 'Commerce', 'Hôtellerie/Restauration', 'Industrie', 'Santé', 'Autre', 'À renseigner'];
@@ -99,6 +105,19 @@ function bulkBar() {
 }
 
 export function render({year, params, sub}) {
+  if (params.get('tab') === 'recouvrement') {
+    const rec = M.recovery();
+    return `
+  <section class="ph">
+    <div>
+      <p class="ph-eyebrow">Redevance spéciale · recouvrement</p>
+      <h1>${esc(fmt.eur(rec.confirmed))} à recouvrer, ${esc(fmt.eur(rec.unsure))} encore à vérifier</h1>
+      <p class="ph-lede">Tous exercices confondus. Le premier montant ne compte que les dossiers qualifiés (titre émis ou facturé non titré) ; le second, les dossiers dont la situation reste à vérifier. Les relances se préparent ici et partent de votre messagerie.</p>
+    </div>
+  </section>
+  ${rsTabs('recouvrement', year)}
+  ${reco.render()}`;
+  }
   readParams(params);
   if (selYear !== year) { sel.clear(); selYear = year; }
   const data = M.rsYear(year);
@@ -119,6 +138,7 @@ export function render({year, params, sub}) {
       <button class="btn btn-primary" data-new>${icon('plus', 16)}Nouvelle entreprise</button>
     </div>
   </section>
+  ${rsTabs('suivi', year)}
 
   <section class="grid g-4">
     <div class="card kpi"><span class="kpi-label">Facturé ${year}</span><span class="kpi-value">${esc(fmt.short(data.billed))}</span><span class="kpi-meta">${esc(fmt.eurc(data.billed))}</span></div>
@@ -400,7 +420,8 @@ async function applyBulk(year, situation) {
   } catch (err) { toast(err.message, 'error'); }
 }
 
-export function mount(root, {year, sub}) {
+export function mount(root, {year, sub, params}) {
+  if (params.get('tab') === 'recouvrement') { reco.mount(root, params); return; }
   const body = root.querySelector('[data-rs-body]');
   const bar = root.querySelector('[data-bulk]');
   /* Met à jour cases, lignes et barre sans redessiner la page. */
