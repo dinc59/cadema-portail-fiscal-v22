@@ -10,6 +10,7 @@ export const CHANGELOG = [
       {tag: 'Nouveau', text: 'Documents : suppression en un clic des lignes vides de la table, quand leurs fichiers sont déjà classés ailleurs. Un fichier qui n’est classé nulle part n’est jamais supprimé : le portail propose de le classer.', href: '#/documents'},
       {tag: 'Corrigé', text: 'Quand un volet ou une confirmation est ouvert, la touche Tab reste à l’intérieur au lieu de parcourir la page derrière.'},
       {tag: 'Corrigé', text: 'Sur téléphone, les montants des graphiques ne se chevauchent plus : seul l’exercice affiché garde son étiquette, les autres s’affichent au toucher.'},
+      {tag: 'Amélioré', text: 'La mention « © 2026, Made with ❤️ by Dina-Ben » figure en bas de chaque page, en mode réunion et sur le point mensuel PDF.'},
     ],
   },
   {

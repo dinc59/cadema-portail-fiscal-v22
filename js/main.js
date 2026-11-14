@@ -39,6 +39,9 @@ const NAV = [
   {id: 'pilotage', label: 'Pilotage', href: '#/pilotage', menu: 'pilotage'},
   {id: 'documents', label: 'Documents', href: '#/documents'},
 ];
+export const CREDIT = '© 2026, Made with ❤️ by Dina-Ben';
+const creditLine = (cls = '') => `<p class="credit${cls ? ` ${cls}` : ''}">${CREDIT}</p>`;
+
 const PAGES = {accueil, recettes, redevance, finances, pilotage, documents, equipe, nouveautes, reunion, rapport};
 
 /* Fonds disponibles. « Tamisé » est un sombre adouci, plus clair que « Sombre ». */
@@ -246,7 +249,7 @@ function meMenu() {
     <a class="menu-item" href="#/equipe" role="menuitem">${icon('users', 16)}<span>Équipe &amp; paramètres</span></a>
     <button class="menu-item" data-refresh role="menuitem">${icon('refresh', 16)}<span>Actualiser depuis Grist</span><span class="menu-hint">${db.syncedAt ? esc(fmt.rel(db.syncedAt)) : ''}</span></button>
     <div class="menu-sep"></div>
-    <p class="menu-foot">V22 · ${esc(M.param('COPYRIGHT') || 'Pôle fiscalité CADEMA')}</p>
+    <p class="menu-foot">Portail fiscal V22 · ${CREDIT}</p>
   </div>`;
 }
 
@@ -320,12 +323,12 @@ const root = document.getElementById('app');
 let mounted = false;
 
 function shellState() {
-  if (db.status === 'loading') return `<div class="boot">${LOGO}<p>Chargement des données Grist…</p><div class="boot-bar"><span></span></div></div>`;
+  if (db.status === 'loading') return `<div class="boot">${LOGO}<p>Chargement des données Grist…</p><div class="boot-bar"><span></span></div>${creditLine('credit-boot')}</div>`;
   if (db.status === 'offline') return `<div class="boot boot-msg">${LOGO}<h1>Ce portail s’ouvre dans Grist</h1>
-    <p>Ajoutez-le comme vue personnalisée sur une page du document, avec l’accès complet.</p></div>`;
+    <p>Ajoutez-le comme vue personnalisée sur une page du document, avec l’accès complet.</p>${creditLine('credit-boot')}</div>`;
   if (db.status === 'denied') return `<div class="boot boot-msg">${LOGO}<h1>Accès aux données requis</h1>
     <p>Dans Grist, ouvrez le panneau de la vue personnalisée et choisissez <b>Accès complet au document</b>. Le portail lit et écrit directement dans les tables.</p>
-    <p class="muted">${esc(db.error || '')}</p></div>`;
+    <p class="muted">${esc(db.error || '')}</p>${creditLine('credit-boot')}</div>`;
   return '';
 }
 
@@ -370,7 +373,7 @@ export function render({keepScroll = false, enter = keepScroll ? 'none' : 'full'
   document.body.classList.toggle('soft-enter', enter === 'soft');
   const ctx = {year: app.year, sub: app.route.sub, params: app.route.params, app, render};
   root.innerHTML = `${header()}<main id="main" class="page page-${app.route.page}" tabindex="-1">${page.render(ctx)}</main>
-    <footer class="foot"><span>${LOGO.replace('logo-mark', 'logo-mark logo-sm')} Portail Fiscal CADEMA</span><span>Données : document Grist du pôle · lecture et écriture en direct · <a class="link" href="#/nouveautes">Nouveautés</a></span></footer>`;
+    <footer class="foot"><span>${LOGO.replace('logo-mark', 'logo-mark logo-sm')} Portail Fiscal CADEMA</span><span>Données : document Grist du pôle · lecture et écriture en direct · <a class="link" href="#/nouveautes">Nouveautés</a></span>${creditLine()}</footer>`;
   page.mount?.(root.querySelector('main'), ctx);
   moveIndicator(false);
   tabsPill(enter === 'soft');

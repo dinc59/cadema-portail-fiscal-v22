@@ -4,7 +4,7 @@
 import * as M from '../model.js';
 import { esc, icon, fmt } from '../ui.js';
 import { stackedBars } from '../charts.js';
-import { LOGO, author } from '../main.js';
+import { LOGO, author, CREDIT } from '../main.js';
 import { sections } from './reunion.js';
 
 export function render({year}) {
@@ -31,7 +31,7 @@ export function render({year}) {
       ${s.id === 'trajectoire' ? `<div class="report-chart">${stackedBars(M.taxYears().map(y => ({year: y, ...M.taxTotal(y)})), {width: 680, height: 260, active: year})}</div>
         <div class="legend">${M.TAXES.map(t => `<span><span class="sw" style="background:var(--s${t.slot})"></span>${esc(t.short)}</span>`).join('')}<span class="muted">Sous chaque année : produits renseignés sur 6</span></div>` : s.html}
     </section>`).join('')}
-    <footer class="report-foot">Chiffres extraits du document Grist du pôle fiscalité le ${esc(now.toLocaleString('fr-FR', {dateStyle: 'long', timeStyle: 'short'}))}. Un montant « non renseigné » est absent de la table, il n’est pas compté comme zéro.</footer>
+    <footer class="report-foot">Chiffres extraits du document Grist du pôle fiscalité le ${esc(now.toLocaleString('fr-FR', {dateStyle: 'long', timeStyle: 'short'}))}. Un montant « non renseigné » est absent de la table, il n’est pas compté comme zéro.<span class="report-credit">${CREDIT}</span></footer>
   </article>`;
 }
 

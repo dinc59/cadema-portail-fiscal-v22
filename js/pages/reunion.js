@@ -4,7 +4,7 @@
 import * as M from '../model.js';
 import { esc, attr, icon, fmt, badge } from '../ui.js';
 import { stackedBars, ring, mountChart } from '../charts.js';
-import { LOGO } from '../main.js';
+import { LOGO, CREDIT } from '../main.js';
 import { planTone } from './accueil.js';
 
 const today = () => new Date();
@@ -73,7 +73,7 @@ export function render({year}) {
     <div class="m-stage">${cover}${list.map((s, i) => `<section class="m-slide" data-i="${i + 1}"><p class="m-kicker">${esc(s.kicker)}</p><h2>${esc(s.title)}</h2><div class="m-body">${s.html}</div></section>`).join('')}</div>
     <button class="m-nav m-prev" data-step="-1" aria-label="Diapositive précédente">${icon('left', 22)}</button>
     <button class="m-nav m-next" data-step="1" aria-label="Diapositive suivante">${icon('right', 22)}</button>
-    <p class="m-help">← → pour naviguer · F plein écran · Échap pour quitter</p>
+    <p class="m-help"><span class="m-keys">← → pour naviguer · F plein écran · Échap pour quitter · </span>${CREDIT}</p>
   </div>`;
 }
 
