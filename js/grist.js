@@ -142,7 +142,8 @@ export function attachmentIds(value) {
 }
 
 export async function connect() {
-  if (!window.grist) { db.status = 'offline'; emit('status'); return; }
+  /* Ouvert directement dans un onglet (hors vue personnalisée) : rien à lire. */
+  if (!window.grist || window.top === window) { db.status = 'offline'; emit('status'); return; }
   window.grist.ready({requiredAccess: 'full', allowSelectBy: false});
   /* La source du widget est Parametres : toute modification y déclenche une
      relecture. Les autres tables sont relues au retour sur l'onglet et
