@@ -1,11 +1,24 @@
 import * as M from '../model.js';
 import { rows, act, fieldsFor, uploadAttachment, openAttachment, attachmentIds } from '../grist.js';
-import { esc, attr, icon, fmt, badge, empty, openDrawer, closeDrawer, toast, field, select, formData } from '../ui.js';
+import { esc, attr, icon, fmt, badge, empty, openDrawer, closeDrawer, toast, field, select, formData, confirmDialog, flash } from '../ui.js';
 import { author } from '../main.js';
 
 const st = {q: '', type: '', year: ''};
 const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 const typeIcon = t => /1259|1386|EDET|EDAC/.test(t) ? 'table' : /onvention|élib/i.test(t) ? 'edit' : /ourrier/i.test(t) ? 'mail' : 'file';
+
+const DOC_COLS = ['Document_ID', 'Type_Document', 'Exercice', 'Titre', 'Module', 'Fichier', 'Lien', 'Confidentialite', 'Ajoute_Par', 'Date_Ajout', 'Version', 'Statut', 'Taille_Octets'];
+function orphans() {
+  const all = rows('Documents_Fiscaux');
+  const used = new Set(all.filter(r => M.text(r.Titre)).flatMap(r => attachmentIds(r.Fichier)));
+  const empties = all.filter(r => !M.text(r.Titre));
+  return {
+    safe: empties.filter(r => attachmentIds(r.Fichier).every(id => used.has(id))),
+    owned: empties.filter(r => attachmentIds(r.Fichier).some(id => !used.has(id))),
+  };
+}
+/* Copie d'une ligne, pour pouvoir la recréer en cas d'annulation. */
+const backupRow = r => fieldsFor('Documents_Fiscaux', Object.fromEntries(DOC_COLS.map(k => [k, k === 'Fichier' ? (attachmentIds(r.Fichier).length ? ['L', ...attachmentIds(r.Fichier)] : null) : r[k] ?? null])));
 
 function list() {
   const words = norm(st.q).split(/\s+/).filter(Boolean);
@@ -16,10 +29,11 @@ function items(docs) {
   if (!docs.length) return empty('Aucun document', 'Aucun document ne correspond à ces critères.');
   return docs.map(d => {
     const ids = attachmentIds(d.file);
-    return `<div class="doc">
+    return `<div class="doc" data-doc="${d.rowId}">
       <span class="doc-ic">${icon(typeIcon(d.type), 18)}</span>
       <span class="row-main"><b>${esc(d.title)}</b><span>${esc([d.type, d.year ? `exercice ${d.year}` : '', fmt.size(d.size), d.added ? `ajouté ${fmt.date(d.added)}` : '', d.author].filter(Boolean).join(' · '))}</span></span>
       ${ids.length ? `<button class="btn btn-sm btn-ghost" data-att="${ids[0]}">${icon('external', 14)}Ouvrir</button>` : d.link ? `<a class="btn btn-sm btn-ghost" href="${attr(d.link)}" target="_blank" rel="noopener noreferrer">${icon('external', 14)}Lien</a>` : '<span class="muted">Sans fichier</span>'}
+      <button class="icon-btn doc-edit" data-doc-edit="${d.rowId}" aria-label="Modifier ${attr(d.title)}" data-tip="Modifier">${icon('edit', 15)}</button>
     </div>`;
   }).join('');
 }
@@ -30,13 +44,25 @@ export function render({params}) {
   const types = [...new Set(all.map(d => d.type))].sort();
   const ys = [...new Set(all.map(d => d.year).filter(Boolean))].sort((a, b) => b - a);
   const docs = list();
-  const orphans = rows('Documents_Fiscaux').length - all.length;
+  const orph = orphans();
   return `
   <section class="ph">
     <div><p class="ph-eyebrow">Centre documentaire</p><h1>${all.length} pièces fiscales classées</h1>
-    <p class="ph-lede">États 1259 et 1386, EDET, conventions, courriers DGFiP. Les fichiers sont des pièces jointes du document Grist${orphans ? ` — ${orphans} ligne(s) vide(s) masquée(s)` : ''}.</p></div>
+    <p class="ph-lede">États 1259 et 1386, EDET, conventions, courriers DGFiP. Les fichiers sont des pièces jointes du document Grist.</p></div>
     <div class="ph-actions"><button class="btn btn-primary" data-upload>${icon('upload', 16)}Déposer un document</button></div>
   </section>
+  ${orph.safe.length ? `<div class="dupe-note card" data-orph>
+    <span class="check-ic tone-info">${icon('info', 16)}</span>
+    <span class="row-main"><b>${orph.safe.length} ligne${orph.safe.length > 1 ? 's' : ''} vide${orph.safe.length > 1 ? 's' : ''} dans Documents_Fiscaux</b>
+      <span>Sans titre ni type, et leurs fichiers sont déjà classés dans d’autres lignes : les supprimer ne fait perdre aucun document.</span></span>
+    <button class="btn btn-sm" data-orph-del>${icon('trash', 14)}Supprimer les ${orph.safe.length} lignes vides</button>
+  </div>` : ''}
+  ${orph.owned.length ? `<div class="dupe-note card">
+    <span class="check-ic tone-warn">${icon('alert', 16)}</span>
+    <span class="row-main"><b>${orph.owned.length} fichier${orph.owned.length > 1 ? 's' : ''} sans titre</b>
+      <span>Ces lignes portent un fichier qui n’est classé nulle part ailleurs : donnez-leur un titre et un type.</span></span>
+    ${orph.owned.slice(0, 3).map(r => `<button class="btn btn-sm" data-doc-edit="${r.id}">${icon('edit', 14)}Classer la ligne ${r.id}</button>`).join('')}
+  </div>` : ''}
   <section class="grid g-docs">
     <aside class="card card-pad doc-facets">
       <p class="menu-label" style="padding:0 0 8px">Type</p>
@@ -54,6 +80,21 @@ export function render({params}) {
     </article>
   </section>
   <input type="file" hidden data-file>`;
+}
+
+async function deleteOrphans() {
+  const {safe} = orphans();
+  if (!safe.length) return;
+  const ok = await confirmDialog({title: `Supprimer ${safe.length} ligne${safe.length > 1 ? 's' : ''} vide${safe.length > 1 ? 's' : ''} ?`,
+    message: 'Ces lignes n’ont ni titre ni type, et leurs fichiers restent classés dans d’autres lignes. Vous pourrez annuler juste après.', confirm: 'Supprimer'});
+  if (!ok) return;
+  const backup = safe.map(backupRow);
+  try {
+    await act(safe.map(r => ['RemoveRecord', 'Documents_Fiscaux', r.id]));
+    toast(`${safe.length} ligne${safe.length > 1 ? 's' : ''} vide${safe.length > 1 ? 's' : ''} supprimée${safe.length > 1 ? 's' : ''}`, 'ok', {action: 'Annuler', timeout: 9000, onAction: async () => {
+      try { await act(backup.map(b => ['AddRecord', 'Documents_Fiscaux', null, b])); toast('Lignes restaurées', 'info'); } catch (err) { toast(err.message, 'error'); }
+    }});
+  } catch (err) { toast(err.message, 'error'); }
 }
 
 function uploadDrawer(file) {
@@ -85,6 +126,83 @@ function uploadDrawer(file) {
   });
 }
 
+function editDrawer(rowId) {
+  const r = rows('Documents_Fiscaux').find(x => x.id === rowId);
+  if (!r) return;
+  const y = new Date().getFullYear();
+  const years = [...new Set([...Array.from({length: 10}, (_, i) => y + 1 - i), M.num(r.Exercice)].filter(Boolean))].sort((a, b) => b - a);
+  const ids = attachmentIds(r.Fichier);
+  const types = [...new Set([...M.DOC_TYPES, M.text(r.Type_Document)].filter(Boolean))];
+  openDrawer({
+    id: `doc:${rowId}`, title: esc(M.text(r.Titre) || 'Document sans titre'), subtitle: `Ligne ${rowId} de Documents_Fiscaux${M.text(r.Ajoute_Par) ? ` · ajouté par ${esc(M.text(r.Ajoute_Par))}` : ''}`,
+    body: `<form class="form-grid" id="doc-edit">
+      <div class="span-2">${field('Titre', `<input name="Titre" value="${attr(M.text(r.Titre))}" required autofocus>`)}</div>
+      ${field('Type', select('Type_Document', types, M.text(r.Type_Document) || 'Autre'))}
+      ${field('Exercice', select('Exercice', [['', '—'], ...years], M.num(r.Exercice) || ''))}
+      ${field('Version', `<input name="Version" value="${attr(M.text(r.Version))}">`)}
+      ${field('Statut', select('Statut', ['Classé', 'À vérifier', 'Archivé'], M.text(r.Statut) || 'Classé'))}
+      <div class="span-2">${field('Lien (facultatif)', `<input name="Lien" value="${attr(M.text(r.Lien))}" placeholder="https://…">`)}</div>
+    </form>
+    <p class="form-section">Fichier</p>
+    <div class="piece-line">
+      <span class="piece-ic${ids.length ? ' on' : ''}">${icon('file', 18)}</span>
+      <span class="row-main"><b>${ids.length ? 'Fichier joint' : 'Aucun fichier'}</b><span>${ids.length ? `${fmt.size(M.num(r.Taille_Octets)) || 'taille inconnue'} · pièce jointe Grist` : 'Déposez le fichier pour le rattacher'}</span></span>
+      ${ids.length ? `<button class="btn btn-sm" data-att="${ids[0]}">${icon('external', 14)}Ouvrir</button>` : ''}
+      <button class="btn btn-sm" data-replace>${icon('upload', 14)}${ids.length ? 'Remplacer' : 'Déposer'}</button>
+      <input type="file" hidden data-replace-file>
+    </div>`,
+    footer: `<button class="btn btn-ghost left" data-doc-del>${icon('trash', 15)}Supprimer</button><button class="btn btn-ghost" data-close>Annuler</button><button class="btn btn-primary" data-doc-save>${icon('check', 16)}Enregistrer</button>`,
+    onMount(el) {
+      el.addEventListener('click', async e => {
+        const att = e.target.closest('[data-att]');
+        if (att) { openAttachment(Number(att.dataset.att)).catch(err => toast(err.message, 'error')); return; }
+        if (e.target.closest('[data-replace]')) { el.querySelector('[data-replace-file]').click(); return; }
+        const save = e.target.closest('[data-doc-save]');
+        if (save) {
+          const v = formData(el.querySelector('#doc-edit'));
+          if (!v.Titre.trim()) { toast('Donnez un titre au document', 'error'); return; }
+          save.disabled = true;
+          try {
+            await act([['UpdateRecord', 'Documents_Fiscaux', rowId, fieldsFor('Documents_Fiscaux', {
+              Titre: v.Titre.trim(), Type_Document: v.Type_Document, Exercice: v.Exercice ? Number(v.Exercice) : null,
+              Version: v.Version, Statut: v.Statut, Lien: v.Lien.trim(), Module: M.text(r.Module) || 'Fiscalité',
+              Document_ID: M.text(r.Document_ID) || `doc-${rowId}`,
+            })]]);
+            closeDrawer(); toast('Document mis à jour');
+            flash(document.querySelector(`[data-doc="${rowId}"]`));
+          } catch (err) { toast(err.message, 'error'); save.disabled = false; }
+          return;
+        }
+        if (e.target.closest('[data-doc-del]')) {
+          const title = M.text(r.Titre) || `ligne ${rowId}`;
+          const ok = await confirmDialog({title: 'Supprimer ce document ?', message: `« ${title} » sera retiré de Documents_Fiscaux. Vous pourrez annuler juste après.`, confirm: 'Supprimer', danger: true});
+          if (!ok) return;
+          const backup = backupRow(r);
+          try {
+            await act([['RemoveRecord', 'Documents_Fiscaux', rowId]]);
+            closeDrawer();
+            toast(`« ${title} » supprimé`, 'ok', {action: 'Annuler', timeout: 9000, onAction: async () => {
+              try { await act([['AddRecord', 'Documents_Fiscaux', null, backup]]); toast('Document restauré', 'info'); } catch (err) { toast(err.message, 'error'); }
+            }});
+          } catch (err) { toast(err.message, 'error'); }
+        }
+      });
+      el.addEventListener('change', async e => {
+        if (!e.target.matches('[data-replace-file]')) return;
+        const file = e.target.files[0]; e.target.value = '';
+        if (!file) return;
+        toast(`Envoi de ${file.name}…`, 'info', {timeout: 2500});
+        try {
+          const attId = await uploadAttachment(file);
+          await act([['UpdateRecord', 'Documents_Fiscaux', rowId, fieldsFor('Documents_Fiscaux', {Fichier: ['L', attId], Taille_Octets: file.size, Date_Ajout: M.nowSeconds(), Ajoute_Par: author()})]]);
+          toast(`${file.name} rattaché au document`);
+          editDrawer(rowId);
+        } catch (err) { toast(err.message, 'error'); }
+      });
+    },
+  });
+}
+
 export function mount(root) {
   const box = root.querySelector('[data-docs]');
   const redraw = () => { const d = list(); box.innerHTML = items(d); root.querySelector('.result-count').textContent = `${d.length} document(s)`; };
@@ -96,6 +214,9 @@ export function mount(root) {
     if (yy) { st.year = yy.dataset.dyear; root.querySelectorAll('[data-dyear]').forEach(b => b.setAttribute('aria-pressed', b === yy)); redraw(); return; }
     const att = e.target.closest('[data-att]');
     if (att) { openAttachment(Number(att.dataset.att)).catch(err => toast(err.message, 'error')); return; }
+    const ed = e.target.closest('[data-doc-edit]');
+    if (ed) { editDrawer(Number(ed.dataset.docEdit)); return; }
+    if (e.target.closest('[data-orph-del]')) { deleteOrphans(); return; }
     if (e.target.closest('[data-upload]')) root.querySelector('[data-file]').click();
   });
   root.querySelector('[data-file]').addEventListener('change', e => { const file = e.target.files[0]; e.target.value = ''; if (file) uploadDrawer(file); });

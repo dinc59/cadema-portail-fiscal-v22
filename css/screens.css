@@ -284,3 +284,7 @@ body.no-enter .siret-ok { animation: none; }
 .ech.is-dup label { cursor: default; opacity: .7; }
 .ech .row-main b { font-size: 13.5px; }
 .ech .row-main span { font-size: 12px; }
+
+/* ── Documents : modification ─────────────────────────────────────── */
+.doc .doc-edit { width: 30px; height: 30px; transition: opacity 150ms ease, background-color 150ms ease, color 150ms ease; }
+@media (hover: hover) and (pointer: fine) { .doc:not(:hover):not(:focus-within) .doc-edit { opacity: .4; } }

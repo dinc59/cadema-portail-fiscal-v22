@@ -128,6 +128,22 @@ export function toast(message, tone = 'ok', {action, onAction, timeout = 4200} =
   arm();
 }
 
+/* ── Focus clavier ───────────────────────────────────────────────────
+   Tab et Maj+Tab tournent à l'intérieur d'un volet ou d'une fenêtre ouverte
+   au lieu de partir dans la page cachée derrière. */
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+function trapTab(container, e) {
+  if (e.key !== 'Tab') return;
+  const items = [...container.querySelectorAll(FOCUSABLE)].filter(el => !el.hidden && el.offsetParent !== null);
+  if (!items.length) { e.preventDefault(); return; }
+  const first = items[0], last = items[items.length - 1];
+  const inside = container.contains(document.activeElement) && document.activeElement !== container;
+  if (e.shiftKey && (document.activeElement === first || !inside)) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && (document.activeElement === last || !inside)) { e.preventDefault(); first.focus(); }
+}
+/* La page derrière devient inerte : ni clic, ni Tab, ni lecteur d'écran. */
+const appRoot = () => document.getElementById('app');
+
 /* ── Tiroir latéral (fiches) ─────────────────────────────────────────── */
 let drawerEl, lastFocus, drawerOnClose;
 export function openDrawer({title, subtitle = '', body, footer = '', wide = false, onMount, onClose, id = ''}) {
@@ -149,7 +165,10 @@ export function openDrawer({title, subtitle = '', body, footer = '', wide = fals
     </aside>`;
   document.body.appendChild(drawerEl);
   document.body.classList.add('has-overlay');
+  appRoot()?.setAttribute('inert', '');
   drawerEl.addEventListener('click', e => { if (e.target.closest('[data-close]')) closeDrawer(); });
+  const panel = drawerEl.querySelector('.drawer');
+  drawerEl.addEventListener('keydown', e => trapTab(panel, e));
   requestAnimationFrame(() => {
     drawerEl?.setAttribute('data-open', '');
     const target = drawerEl?.querySelector('.drawer [autofocus]') || drawerEl?.querySelector('.drawer');
@@ -164,6 +183,7 @@ export function closeDrawer(instant = false) {
   const cb = drawerOnClose; drawerOnClose = null;
   if (!instant) cb?.();
   document.body.classList.remove('has-overlay');
+  appRoot()?.removeAttribute('inert');
   if (instant) el.remove();
   else { el.removeAttribute('data-open'); el.setAttribute('data-leaving', ''); setTimeout(() => el.remove(), 220); }
   lastFocus?.focus?.({preventScroll: true});
@@ -192,15 +212,17 @@ export function confirmDialog({title, message, confirm = 'Confirmer', danger = f
         <div class="modal-actions"><button class="btn btn-ghost" data-v="0">Annuler</button>
         <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" data-v="1">${esc(confirm)}</button></div>
       </div>`;
+    const before = document.activeElement;
     document.body.appendChild(wrap);
     requestAnimationFrame(() => wrap.setAttribute('data-open', ''));
-    const done = v => { wrap.remove(); resolve(v); };
+    /* Retour du focus sur le bouton qui a ouvert la confirmation. */
+    const done = v => { wrap.remove(); if (before?.isConnected) before.focus({preventScroll: true}); resolve(v); };
     wrap.addEventListener('click', e => {
       const b = e.target.closest('[data-v]');
       if (b) done(b.dataset.v === '1');
       else if (e.target.classList.contains('modal-scrim')) done(false);
     });
-    wrap.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); done(false); } });
+    wrap.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); done(false); } else trapTab(wrap.querySelector('.modal'), e); });
     wrap.querySelector('[data-v="1"]').focus();
   });
 }

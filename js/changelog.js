@@ -3,6 +3,16 @@
    La plus récente en premier. `id` sert à savoir ce qu'un agent a déjà vu. */
 export const CHANGELOG = [
   {
+    id: '22.9', date: '2026-11-14', title: 'Finitions : documents, clavier, téléphone',
+    summary: 'Les documents se corrigent depuis le portail, et la navigation au clavier est plus sûre.',
+    items: [
+      {tag: 'Nouveau', text: 'Documents : modifier le titre, le type, l’exercice ou le statut d’un document, remplacer son fichier, ou le supprimer (avec Annuler).', href: '#/documents'},
+      {tag: 'Nouveau', text: 'Documents : suppression en un clic des lignes vides de la table, quand leurs fichiers sont déjà classés ailleurs. Un fichier qui n’est classé nulle part n’est jamais supprimé : le portail propose de le classer.', href: '#/documents'},
+      {tag: 'Corrigé', text: 'Quand un volet ou une confirmation est ouvert, la touche Tab reste à l’intérieur au lieu de parcourir la page derrière.'},
+      {tag: 'Corrigé', text: 'Sur téléphone, les montants des graphiques ne se chevauchent plus : seul l’exercice affiché garde son étiquette, les autres s’affichent au toucher.'},
+    ],
+  },
+  {
     id: '22.8', date: '2026-11-14', title: 'Mode réunion et point mensuel en PDF',
     summary: 'Les chiffres clés se présentent en plein écran et s’exportent en PDF.',
     items: [

@@ -99,7 +99,7 @@ export function statusBars(points, {slot = 1, width = 720, height = 280, active}
     out += `<g class="bar-g" style="--d:${i * 45}ms">
       <rect class="hit" x="${cx - band / 2}" y="${padT - 20}" width="${band}" height="${ih + padB + 20}" data-tip="${attr(tip)}"${active === p.year ? ' data-active' : ''} data-pick="${p.year}"/>
       ${has ? `<g class="bar-m"><path class="seg seg-${kind}" style="--c:var(--s${slot})" d="${roundTop(x, y(p.amount), bw, y(0) - y(p.amount), 4)}"/></g>
-        <text class="val" x="${cx}" y="${y(p.amount) - 7}" text-anchor="middle">${esc(fmt.short(p.amount))}</text>`
+        ${band >= 58 || p.year === active ? `<text class="val" x="${cx}" y="${y(p.amount) - 7}" text-anchor="middle">${esc(fmt.short(p.amount))}</text>` : ''}`
       : `<rect class="gap" x="${x}" y="${y(0) - 26}" width="${bw}" height="26" rx="4"/>`}
       <text class="axis axis-x${active === p.year ? ' is-active' : ''}" x="${cx}" y="${H - 9}" text-anchor="middle">${p.year}</text>
     </g>`;
@@ -133,7 +133,7 @@ export function deltaBars(points, {width = 520, height = 240, active} = {}) {
       const h = Math.max(2, Math.abs(p.delta) / m * half);
       const up = p.delta >= 0;
       mark = `<g class="bar-m ${up ? 'is-up' : 'is-down'}"><path class="seg ${up ? 'd-up' : 'd-down'}" d="${up ? roundTop(x, zero - h, bw, h, 4) : roundBottom(x, zero, bw, h, 4)}"/></g>
-        <text class="val" x="${cx}" y="${up ? zero - h - 6 : zero + h + 14}" text-anchor="middle">${esc(fmt.delta(p.delta))}</text>`;
+        ${band >= 58 || p.year === active ? `<text class="val" x="${cx}" y="${up ? zero - h - 6 : zero + h + 14}" text-anchor="middle">${esc(fmt.delta(p.delta))}</text>` : ''}`;
     } else {
       mark = `<text class="axis" x="${cx}" y="${zero - 6}" text-anchor="middle">—</text>`;
     }

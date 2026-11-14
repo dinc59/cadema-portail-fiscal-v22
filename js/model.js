@@ -323,7 +323,7 @@ export function quality(year) {
   const orphanDocs = rows('Documents_Fiscaux').filter(r => !text(r.Titre));
   add({id: 'doc-orphans', level: 'info', title: 'Lignes documentaires vides',
     ok: !orphanDocs.length, count: orphanDocs.length, detail: `${orphanDocs.length} ligne(s) sans titre ni type dans Documents_Fiscaux`,
-    fix: 'Supprimer ces lignes dans Grist ou les compléter.', route: '#/documents', ratio: rows('Documents_Fiscaux').length ? orphanDocs.length / rows('Documents_Fiscaux').length : 0});
+    fix: 'Les supprimer en un clic depuis Documents (aucun fichier n’est perdu).', route: '#/documents', ratio: rows('Documents_Fiscaux').length ? orphanDocs.length / rows('Documents_Fiscaux').length : 0});
 
   const budgets = rows('Budgets').filter(r => num(r.Exercice) === year - 1 || num(r.Exercice) === year);
   const toImport = budgets.filter(r => /importer/i.test(text(r.Source)) || num(r.Recettes_Realisees) === null);
