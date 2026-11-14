@@ -1,6 +1,6 @@
 import * as M from '../model.js';
 import { rows, act, fieldsFor, uploadAttachment, openAttachment, attachmentIds } from '../grist.js';
-import { esc, attr, icon, fmt, badge, empty, openDrawer, patchDrawer, drawerOpen, drawerId, toast, field, select, formData, downloadCsv } from '../ui.js';
+import { esc, attr, icon, fmt, badge, empty, openDrawer, patchDrawer, drawerOpen, drawerId, toast, field, select, formData, downloadCsv, flash } from '../ui.js';
 import { author, render as rerender } from '../main.js';
 
 const SORTS = [['rest', 'Reste à recouvrer'], ['name', 'Nom (A→Z)'], ['billed', 'Montant facturé'], ['updated', 'Dernière mise à jour']];
@@ -216,6 +216,7 @@ function bindFiche(el, id, year) {
         toast('Fiche entreprise enregistrée');
       }
       openFiche(id, year);
+      flash(document.querySelector(`tr[data-open="${CSS.escape(id)}"]`));
     } catch (err) { toast(err.message, 'error'); btn.disabled = false; }
   });
   el.addEventListener('click', async e => {
@@ -276,23 +277,25 @@ function newCompany(year) {
 
 export function mount(root, {year, sub}) {
   const body = root.querySelector('[data-rs-body]');
-  const refreshList = () => {
+  const refreshList = (fade = false) => {
     const data = M.rsYear(year);
     const list = filtered(data);
     body.innerHTML = tableRows(list);
+    /* Filtre choisi d'un clic : fondu bref. Frappe dans la recherche : rien. */
+    if (fade) body.animate([{opacity: .3}, {opacity: 1}], {duration: 180, easing: 'ease-out'});
     root.querySelector('.result-count').textContent = `${list.length} / ${data.list.length}`;
     const sum = k => list.reduce((s, x) => s + (x.situation === 'Non concernée' ? 0 : (x[k] || 0)), 0);
     for (const k of ['billed', 'paid', 'rest']) root.querySelector(`[data-sum="${k}"]`).textContent = fmt.eurc(sum(k));
     writeParams(drawerOpen() ? drawerId() : '');
   };
   root.querySelector('.search-field input').addEventListener('input', e => { f.q = e.target.value; refreshList(); });
-  root.querySelectorAll('[data-f]').forEach(s => s.addEventListener('change', e => { f[s.dataset.f] = e.target.value; refreshList(); }));
+  root.querySelectorAll('[data-f]').forEach(s => s.addEventListener('change', e => { f[s.dataset.f] = e.target.value; refreshList(true); }));
   root.addEventListener('click', e => {
     const chip = e.target.closest('[data-sit]');
     if (chip) {
       f.situation = chip.dataset.sit;
       root.querySelectorAll('.chips-row [data-sit]').forEach(c => c.setAttribute('aria-pressed', c.dataset.sit === f.situation));
-      refreshList();
+      refreshList(true);
       if (chip.classList.contains('kpi-btn')) root.querySelector('.rs-table').scrollIntoView({behavior: 'smooth', block: 'start'});
       return;
     }

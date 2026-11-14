@@ -1,6 +1,6 @@
 import * as M from '../model.js';
 import { rows, act, fieldsFor } from '../grist.js';
-import { esc, attr, icon, fmt, badge, empty, avatar, openDrawer, closeDrawer, toast, field, select, formData, confirmDialog } from '../ui.js';
+import { esc, attr, icon, fmt, badge, empty, avatar, openDrawer, closeDrawer, toast, field, select, formData, confirmDialog, flash } from '../ui.js';
 import { ring } from '../charts.js';
 import { author } from '../main.js';
 import { planTone } from './accueil.js';
@@ -84,12 +84,14 @@ function taskDrawer(rowId) {
         });
         e.currentTarget.disabled = true;
         try {
+          let savedId = t?.rowId;
           if (t) await act([['UpdateRecord', 'Taches', t.rowId, fields]]);
           else {
             const n = Math.max(0, ...rows('Taches').map(r => Number(String(r.Tache_ID || '').replace(/\D/g, '')) || 0)) + 1;
-            await act([['AddRecord', 'Taches', null, {...fields, ...fieldsFor('Taches', {Tache_ID: `task-${n}`, Module: 'Pôle fiscalité', Date_Creation: M.nowSeconds(), Notes_JSON: '[]'})}]]);
+            savedId = (await act([['AddRecord', 'Taches', null, {...fields, ...fieldsFor('Taches', {Tache_ID: `task-${n}`, Module: 'Pôle fiscalité', Date_Creation: M.nowSeconds(), Notes_JSON: '[]'})}]]))[0];
           }
           closeDrawer(); toast(t ? 'Priorité mise à jour' : 'Priorité créée');
+          flash(document.querySelector(`[data-task="${savedId}"]`));
         } catch (err) { toast(err.message, 'error'); e.currentTarget.disabled = false; }
       });
       el.querySelector('[data-del]')?.addEventListener('click', async () => {
@@ -210,7 +212,7 @@ function qualityView(year) {
         <p class="card-sub">${q.checks.filter(c => c.ok).length} contrôle(s) satisfait(s) sur ${q.checks.length}. Chaque contrôle compte au prorata de ce qui est conforme, pondéré : critique ×3, vigilance ×2, à compléter ×1.</p></div>
       </article>
       <article class="card card-pad"><h2 class="card-title">Comment il est calculé</h2>
-        <p class="card-sub" style="margin-top:8px">Aucune valeur n’est estimée : un exercice sans produit est signalé comme manquant, jamais compté comme zéro. Les doublons de la table Taxes sont détectés par produit et exercice ; le portail retient la ligne la plus récente.</p></article>
+        <p class="card-sub" style="margin-top:8px">Aucune valeur n’est estimée : un exercice sans produit est signalé comme manquant, jamais compté comme zéro. Les doublons de la table Taxes sont détectés par produit et exercice ; le portail retient la ligne la plus avancée (définitif, puis renseigné, puis prévision).</p></article>
     </aside>
   </section>`;
 }
@@ -228,7 +230,7 @@ export function mount(root, {params}) {
     const s = e.target.closest('[data-plan]');
     if (!s) return;
     s.className = `status-select tone-${planTone(s.value)}`;
-    try { await act([['UpdateRecord', 'Plans_Actions', Number(s.dataset.plan), {Statut: s.value}]]); toast(`Statut : ${s.value}`); }
+    try { await act([['UpdateRecord', 'Plans_Actions', Number(s.dataset.plan), {Statut: s.value}]]); toast(`Statut : ${s.value}`); flash(document.querySelector(`[data-plan="${s.dataset.plan}"]`)?.closest('.plan')); }
     catch (err) { toast(err.message, 'error'); }
   });
   if (params.get('new') === '1') {

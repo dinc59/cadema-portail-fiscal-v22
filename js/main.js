@@ -300,7 +300,30 @@ function shellState() {
   return '';
 }
 
-export function render({keepScroll = false} = {}) {
+let lastTab = null;
+/* Pastille des onglets : elle glisse de l'ancien onglet vers le nouveau. */
+function tabsPill(slide) {
+  const tabs = root.querySelector('main .tabs');
+  const cur = tabs?.querySelector('[aria-current="page"]');
+  if (!cur) { lastTab = null; return; }
+  const pill = document.createElement('span');
+  pill.className = 'tabs-pill';
+  tabs.prepend(pill);
+  const set = r => { pill.style.width = `${r.w}px`; pill.style.transform = `translateX(${r.x}px)`; };
+  const now = {page: app.route.page, x: cur.offsetLeft, w: cur.offsetWidth};
+  if (slide && lastTab?.page === now.page && lastTab.x !== now.x) {
+    pill.style.transition = 'none';
+    set(lastTab);
+    pill.getBoundingClientRect();
+    pill.style.transition = '';
+  }
+  set(now);
+  lastTab = now;
+}
+
+/* `enter` : 'full' (nouvelle page), 'soft' (changement d'onglet), 'none'
+   (rafraîchissement : rien ne bouge). */
+export function render({keepScroll = false, enter = keepScroll ? 'none' : 'full'} = {}) {
   const special = shellState();
   if (special) { root.innerHTML = special; mounted = false; return; }
   const years = M.years();
@@ -313,12 +336,14 @@ export function render({keepScroll = false} = {}) {
   const selStart = active?.selectionStart, selEnd = active?.selectionEnd;
   const scroll = scrollY;
 
-  document.body.classList.toggle('no-enter', keepScroll);
+  document.body.classList.toggle('no-enter', enter === 'none');
+  document.body.classList.toggle('soft-enter', enter === 'soft');
   const ctx = {year: app.year, sub: app.route.sub, params: app.route.params, app, render};
   root.innerHTML = `${header()}<main id="main" class="page page-${app.route.page}" tabindex="-1">${page.render(ctx)}</main>
     <footer class="foot"><span>${LOGO.replace('logo-mark', 'logo-mark logo-sm')} Portail Fiscal CADEMA</span><span>Données : document Grist du pôle · lecture et écriture en direct</span></footer>`;
   page.mount?.(root.querySelector('main'), ctx);
   moveIndicator(false);
+  tabsPill(enter === 'soft');
   mounted = true;
 
   if (focusKey) {
@@ -340,7 +365,7 @@ function moveIndicator(animate = true) {
   ind.style.transform = `translateX(${c.left - n.left + 12}px) scaleX(${(c.width - 24) / 100})`;
 }
 
-let lastPage = null;
+let lastPage = null, lastSub = '', lastView = '';
 function onRoute() {
   closePop();
   hoverArmed = false;
@@ -351,8 +376,14 @@ function onRoute() {
   document.body.classList.remove('nav-open');
   const prev = root.querySelector('.nav-indicator');
   const prevTransform = prev?.style.transform;
-  render({keepScroll: samePage});
-  if (!samePage) scrollTo(0, 0);
+  /* Même page : un changement de fiche vaut une nouvelle page, un changement
+     d'onglet une entrée douce, le reste (filtres, tiroir) ne bouge pas. */
+  const view = `${r.params.get('tab') || ''}|${r.params.get('statut') || ''}`;
+  const newSub = samePage && r.page !== 'redevance' && r.sub !== lastSub;
+  const enter = !samePage || newSub ? 'full' : view !== lastView ? 'soft' : 'none';
+  render({keepScroll: samePage && !newSub, enter});
+  if (enter === 'full') scrollTo(0, 0);
+  lastSub = r.sub; lastView = view;
   /* La pastille glisse de l'ancienne entrée vers la nouvelle. */
   const ind = root.querySelector('.nav-indicator');
   if (ind && prevTransform && !samePage) {
@@ -380,7 +411,16 @@ document.addEventListener('click', e => {
   const mb = t.closest('[data-menu]');
   if (mb) { openPop(mb.closest('.nav-item'), menuPanel(mb.dataset.menu), {align: 'center', cls: 'pop-mega'}); return; }
   const y = t.closest('[data-year]');
-  if (y && pop) { app.year = Number(y.dataset.year); store.set('cadema-v22-year', app.year); closePop(); render({keepScroll: true}); toast(`Exercice ${app.year}`, 'info', {timeout: 1800}); return; }
+  if (y && pop) {
+    app.year = Number(y.dataset.year); store.set('cadema-v22-year', app.year); closePop();
+    /* L'exercice global reprend la main sur l'exercice choisi dans une fiche. */
+    if (/[?&]an=\d+/.test(location.hash)) history.replaceState(null, '', location.hash.replace(/([?&])an=\d+&?/, '$1').replace(/[?&]$/, ''));
+    render({keepScroll: true});
+    /* Tout le contenu vient de changer : un fondu bref le signale. */
+    root.querySelector('main')?.animate([{opacity: .35}, {opacity: 1}], {duration: 220, easing: 'ease-out'});
+    toast(`Exercice ${app.year}`, 'info', {timeout: 1800});
+    return;
+  }
   const pr = t.closest('[data-profile]');
   if (pr) { app.profile = pr.dataset.profile; store.set('cadema-v22-profile', app.profile); closePop(); render({keepScroll: true}); toast(`Bonjour ${app.profile}`, 'ok', {timeout: 2200}); return; }
   const th = t.closest('[data-theme-set]');

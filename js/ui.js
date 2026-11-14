@@ -98,6 +98,17 @@ export function icon(name, size = 18, extra = '') {
   return `<svg class="ic ${extra}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name] || ''}</svg>`;
 }
 
+/* ── Mouvement ──────────────────────────────────────────────────────── */
+export const motionOK = () => !matchMedia('(prefers-reduced-motion: reduce)').matches;
+/* Retour visuel après un enregistrement : la ligne modifiée s'éclaire puis
+   s'éteint. Une couleur, pas un déplacement : conservé en mouvement réduit. */
+export function flash(el) {
+  if (!el?.animate) return;
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--flash').trim() || 'rgba(12,107,109,.18)';
+  const targets = el.matches('tr') ? [...el.children] : [el];
+  for (const t of targets) t.animate([{backgroundColor: color}, {backgroundColor: color, offset: .25}, {backgroundColor: 'transparent'}], {duration: 1400, easing: 'ease-out'});
+}
+
 /* ── Toasts ─────────────────────────────────────────────────────────── */
 let toastHost;
 export function toast(message, tone = 'ok', {action, onAction, timeout = 4200} = {}) {

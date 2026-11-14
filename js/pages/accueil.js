@@ -1,6 +1,6 @@
 import * as M from '../model.js';
 import { esc, attr, icon, fmt, badge } from '../ui.js';
-import { stackedBars, ring } from '../charts.js';
+import { stackedBars, ring, mountChart } from '../charts.js';
 
 function comparable(year) {
   /* Évolution à périmètre constant : seuls les produits connus les deux
@@ -21,7 +21,6 @@ export function render({year, app}) {
   const open = tasks.filter(t => t.status !== 'Terminé');
   const q = M.quality(year);
   const ys = M.taxYears().filter(y => y <= Math.max(year, ...M.taxYears()));
-  const chartData = ys.map(y => ({year: y, ...M.taxTotal(y)}));
   const today = new Date();
   const hello = today.getHours() < 18 ? 'Bonjour' : 'Bonsoir';
   const plans = M.plans();
@@ -84,7 +83,7 @@ export function render({year, app}) {
         <a class="btn btn-sm btn-ghost" href="#/recettes">${icon('table', 15)}Tableau</a>
       </div>
       <div class="card-body">
-        ${stackedBars(chartData, {active: year})}
+        <div class="chart-slot" data-chart="traj"></div>
         <div class="legend mt">${M.TAXES.map(t => `<span><span class="sw" style="background:var(--s${t.slot})"></span>${esc(t.short)}</span>`).join('')}
           <span class="muted">Barre atténuée = exercice incomplet</span></div>
       </div>
@@ -148,6 +147,8 @@ export function render({year, app}) {
 
 export const planTone = s => ({'Réalisé': 'good', 'En cours': 'info', 'À sécuriser': 'warn', 'Abandonné': 'neutral'}[s] || 'accent');
 
-export function mount(root) {
-  root.querySelectorAll('.hit[data-year]').forEach(h => h.addEventListener('click', () => { location.hash = '#/recettes'; }));
+export function mount(root, {year}) {
+  const data = M.taxYears().map(y => ({year: y, ...M.taxTotal(y)}));
+  mountChart(root.querySelector('[data-chart="traj"]'), w => stackedBars(data, {width: w, active: year}));
+  root.addEventListener('click', e => { if (e.target.closest('.hit[data-year]')) location.hash = '#/recettes'; });
 }

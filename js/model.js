@@ -55,8 +55,10 @@ export function defaultYear() {
 }
 
 /* ── Recettes fiscales ─────────────────────────────────────────────── */
-/* Une ligne par (code, exercice). Si Grist contient des doublons, la ligne
-   la plus récemment mise à jour gagne, et le doublon est signalé. */
+/* Une ligne par (code, exercice). Si Grist contient plusieurs lignes, la plus
+   avancée est retenue (définitif, puis renseigné, puis prévision), puis la
+   plus récente ; les autres sont signalées comme doublons. */
+export const statusRank = s => /d[ée]finitif|notifi/i.test(text(s)) ? 3 : /pr[ée]vision/i.test(text(s)) ? 1 : 2;
 export function taxCell(code, year) {
   const matches = rows('Taxes').filter(r => text(r.Code).toUpperCase() === code && num(r.Exercice) === year);
   if (!matches.length) {
@@ -65,12 +67,33 @@ export function taxCell(code, year) {
     const amount = num(p.Realise) ?? num(p.Prevision);
     return amount === null ? null : {amount, status: 'Renseigné', source: text(p.Source), rowId: null, dupes: 0, fromProduits: true};
   }
-  const best = [...matches].sort((a, b) => (num(b.Derniere_MAJ) || 0) - (num(a.Derniere_MAJ) || 0) || b.id - a.id)[0];
+  const best = [...matches].sort((a, b) => statusRank(b.Statut) - statusRank(a.Statut) || (num(b.Derniere_MAJ) || 0) - (num(a.Derniere_MAJ) || 0) || b.id - a.id)[0];
   return {
     amount: num(best.Produit), status: text(best.Statut) || 'Renseigné', source: text(best.Source),
     taux: best.Taux, base: best.Base_Nette, rowId: best.id, updated: toDate(best.Derniere_MAJ),
     responsable: text(best.Responsable), dupes: matches.length - 1, dupeIds: matches.filter(m => m !== best).map(m => m.id),
   };
+}
+
+/* Historique d'une recette : une entrée par exercice connu, avec l'évolution
+   par rapport à l'exercice précédent quand les deux sont renseignés. */
+export function taxHistory(code, extraYear) {
+  const ys = new Set(taxYears());
+  if (extraYear) ys.add(extraYear);
+  const list = [...ys].sort((a, b) => a - b).map(y => ({year: y, cell: taxCell(code, y)}));
+  return list.map((h, i) => {
+    const prev = list[i - 1]?.year === h.year - 1 ? list[i - 1].cell : taxCell(code, h.year - 1);
+    const a = h.cell?.amount, b = prev?.amount;
+    return {...h, amount: a ?? null, delta: a != null && b ? a / b - 1 : null};
+  });
+}
+/* Croissance annuelle moyenne entre le premier et le dernier exercice renseignés. */
+export function taxCagr(code) {
+  const known = taxHistory(code).filter(h => h.amount > 0);
+  if (known.length < 2) return null;
+  const first = known[0], last = known[known.length - 1];
+  const n = last.year - first.year;
+  return n > 0 ? {rate: Math.pow(last.amount / first.amount, 1 / n) - 1, from: first.year, to: last.year} : null;
 }
 
 export function taxYears() {
@@ -229,7 +252,7 @@ export function quality(year) {
   }
   add({id: 'tax-dupes', level: 'critical', title: 'Doublons dans les recettes fiscales',
     ok: !dupes.length, count: dupes.length, detail: dupes.join(' · '),
-    fix: 'Supprimer la ligne en double dans la table Taxes (la plus récente est retenue).', route: '#/recettes', ratio: cells ? dupes.length / cells : 0});
+    fix: 'Supprimer la ligne en double depuis la fiche de la recette (la plus avancée est retenue).', route: '#/recettes', ratio: cells ? dupes.length / cells : 0});
   add({id: 'tax-gaps', level: 'warn', title: 'Années sans produit renseigné',
     ok: !gaps.length, count: gaps.length, detail: gaps.join(' · '),
     fix: 'Saisir le produit depuis la fiche de la recette.', route: '#/recettes', ratio: cells ? gaps.length / cells : 0});
