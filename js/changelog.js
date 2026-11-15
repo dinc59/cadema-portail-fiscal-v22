@@ -3,6 +3,14 @@
    La plus récente en premier. `id` sert à savoir ce qu'un agent a déjà vu. */
 export const CHANGELOG = [
   {
+    id: '22.12', date: '2026-11-15', title: 'Documents : toutes les pièces d’un état, liste par exercice',
+    summary: 'Les EDET mensuels s’ouvrent tous depuis la grille, et la liste se lit année par année.',
+    items: [
+      {tag: 'Amélioré', text: 'Grille des états : une case qui contient plusieurs pièces ouvre la liste complète, dans l’ordre des mois. L’étoile désigne le récapitulatif annuel, qui passe en tête pour toute l’équipe.', href: '#/documents'},
+      {tag: 'Amélioré', text: 'Liste des documents rangée par exercice, du plus récent au plus ancien, avec le type en étiquette de couleur. Les filtres sont au-dessus de la liste.', href: '#/documents'},
+    ],
+  },
+  {
     id: '22.11', date: '2026-11-15', title: 'Taux votés',
     summary: 'Les taux de CFE, de TEOM et du versement mobilité, de la création de la CADEMA à aujourd’hui.',
     items: [

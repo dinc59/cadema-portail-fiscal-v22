@@ -522,3 +522,26 @@ export function rateHistory(code, toYear) {
 export function rateDocs(code) {
   return documents().filter(d => /d[ée]lib/i.test(d.type) && (text(d.module).toUpperCase() === code || new RegExp(`\\b${code}\\b`, 'i').test(d.title)));
 }
+
+/* ── Pièces d'un état (plusieurs EDET par exercice) ────────────────── */
+export const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+/* Mots entiers ou abréviations usuelles seulement : « déclaration » n'est pas décembre. */
+const MONTH_WORDS = ['janv(?:ier)?', 'f[ée]v(?:r(?:ier)?)?', 'mars', 'avr(?:il)?', 'mai', 'juin', 'juil(?:let)?', 'ao[uû]t', 'sept(?:embre)?', 'oct(?:obre)?', 'nov(?:embre)?', 'd[ée]c(?:embre)?']
+  .map(w => new RegExp(`(?<![a-zà-ÿ])(?:${w})\\.?(?![a-zà-ÿ])`));
+/* Mois d'une pièce, lu dans son titre : « EDET mars 2025 », « 2025-03 », « 03/2025 ». */
+export function docMonth(title) {
+  const t = text(title).toLowerCase();
+  const i = MONTH_WORDS.findIndex(rx => rx.test(t));
+  if (i >= 0) return i + 1;
+  const m = /(?<!\d)20\d\d[-_.\/ ](0[1-9]|1[0-2])(?!\d)/.exec(t) || /(?<!\d)(0[1-9]|1[0-2])[-_.\/ ]20\d\d(?!\d)/.exec(t);
+  return m ? Number(m[1]) : null;
+}
+export const RECAP_STATUS = 'Récapitulatif annuel';
+export const isRecap = d => d.status === RECAP_STATUS;
+/* Le récapitulatif annuel d'abord, puis les pièces dans l'ordre des mois,
+   puis celles sans mois reconnu, de la plus récente à la plus ancienne. */
+export function sortPieces(docs) {
+  return [...docs].sort((a, b) => (isRecap(b) - isRecap(a))
+    || ((docMonth(a.title) ?? 99) - (docMonth(b.title) ?? 99))
+    || ((b.added?.getTime() || 0) - (a.added?.getTime() || 0)));
+}

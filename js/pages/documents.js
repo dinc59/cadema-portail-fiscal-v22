@@ -27,16 +27,28 @@ function list() {
   return M.documents().filter(d => (!st.type || d.type === st.type) && (!st.year || String(d.year) === st.year) &&
     (!words.length || words.every(w => norm(`${d.title} ${d.type} ${d.year} ${d.author}`).includes(w))));
 }
+const typeTone = t => /^(1259|1386|EDET|EDAC)$/.test(t) ? 'info' : /élib/i.test(t) ? 'accent' : /onvention/i.test(t) ? 'good' : /ourrier/i.test(t) ? 'warn' : 'neutral';
+const cap = w => w.charAt(0).toUpperCase() + w.slice(1);
+function docRow(d) {
+  const ids = attachmentIds(d.file);
+  const month = M.docMonth(d.title);
+  return `<div class="doc" data-doc="${d.rowId}">
+    <span class="doc-type">${badge(d.type, typeTone(d.type))}</span>
+    <span class="row-main"><b>${esc(d.title)}${M.isRecap(d) ? ` ${badge('Récapitulatif annuel', 'good')}` : ''}</b><span>${esc([month ? cap(M.MONTHS[month - 1]) : '', fmt.size(d.size), d.added ? `ajouté ${fmt.date(d.added)}` : '', d.author].filter(Boolean).join(' · '))}</span></span>
+    ${ids.length ? `<button class="btn btn-sm btn-ghost" data-att="${ids[0]}">${icon('external', 14)}Ouvrir</button>` : d.link ? `<a class="btn btn-sm btn-ghost" href="${attr(d.link)}" target="_blank" rel="noopener noreferrer">${icon('external', 14)}Lien</a>` : '<span class="muted">Sans fichier</span>'}
+    <button class="icon-btn doc-edit" data-doc-edit="${d.rowId}" aria-label="Modifier ${attr(d.title)}" data-tip="Modifier">${icon('edit', 15)}</button>
+  </div>`;
+}
+/* Rangés par exercice (le plus récent en haut), puis par type, puis par mois. */
 function items(docs) {
   if (!docs.length) return empty('Aucun document', 'Aucun document ne correspond à ces critères.');
-  return docs.map(d => {
-    const ids = attachmentIds(d.file);
-    return `<div class="doc" data-doc="${d.rowId}">
-      <span class="doc-ic">${icon(typeIcon(d.type), 18)}</span>
-      <span class="row-main"><b>${esc(d.title)}</b><span>${esc([d.type, d.year ? `exercice ${d.year}` : '', fmt.size(d.size), d.added ? `ajouté ${fmt.date(d.added)}` : '', d.author].filter(Boolean).join(' · '))}</span></span>
-      ${ids.length ? `<button class="btn btn-sm btn-ghost" data-att="${ids[0]}">${icon('external', 14)}Ouvrir</button>` : d.link ? `<a class="btn btn-sm btn-ghost" href="${attr(d.link)}" target="_blank" rel="noopener noreferrer">${icon('external', 14)}Lien</a>` : '<span class="muted">Sans fichier</span>'}
-      <button class="icon-btn doc-edit" data-doc-edit="${d.rowId}" aria-label="Modifier ${attr(d.title)}" data-tip="Modifier">${icon('edit', 15)}</button>
-    </div>`;
+  const groups = new Map();
+  for (const d of docs) { const k = d.year || 0; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(d); }
+  const order = t => { const i = M.DOC_TYPES.indexOf(t); return i < 0 ? 99 : i; };
+  return [...groups.keys()].sort((a, b) => (b || -1) - (a || -1)).map(y => {
+    const list = groups.get(y);
+    const sorted = [...new Set(list.map(d => d.type))].sort((a, b) => order(a) - order(b)).flatMap(t => M.sortPieces(list.filter(d => d.type === t)));
+    return `<section class="doc-group"><h3 class="doc-group-h"><span>${y || 'Sans exercice'}</span><span class="num">${list.length} document${list.length > 1 ? 's' : ''}</span></h3>${sorted.map(docRow).join('')}</section>`;
   }).join('');
 }
 
@@ -48,6 +60,10 @@ function statesCard() {
   const grid = M.statesGrid(current);
   const missing = M.missingStates(current);
   const cell = (c, y) => {
+    if (c.docs.length > 1) {
+      const recap = c.docs.some(M.isRecap);
+      return `<button class="sg-c is-ok" data-state-open="${attr(`${c.type}|${y}`)}" aria-label="Voir les ${c.docs.length} pièces ${esc(c.type)} ${y}">${icon(recap ? 'check' : 'list', 15)}<span>${recap ? 'Récapitulatif' : 'Voir'}</span><span class="sg-n">${c.docs.length} pièces</span></button>`;
+    }
     if (c.docs.length) {
       const d = c.docs[0], ids = attachmentIds(d.file);
       const more = c.docs.length > 1 ? `<span class="sg-n">${c.docs.length} pièces</span>` : '';
@@ -61,7 +77,7 @@ function statesCard() {
   };
   return `<article class="card mt states-card">
     <div class="card-head"><div><p class="card-eyebrow">États fiscaux</p><h2>1259, 1386, EDET et EDAC par exercice</h2>
-      <p class="card-sub">Cliquez un état présent pour l’ouvrir, un état manquant pour le déposer directement au bon exercice.</p></div>
+      <p class="card-sub">Cliquez un état présent pour l’ouvrir (ou voir toutes ses pièces), un état manquant pour le déposer directement au bon exercice.</p></div>
       ${missing.length ? badge(`${missing.length} manquant${missing.length > 1 ? 's' : ''}`, 'warn') : badge('Complet', 'good')}</div>
     <div class="card-body"><div class="states-grid" role="table" aria-label="États fiscaux par exercice">
       <span class="sg-h" role="columnheader">Exercice</span>${M.STATE_TYPES.map(t => `<span class="sg-h" role="columnheader">${esc(t)}</span>`).join('')}
@@ -96,22 +112,19 @@ export function render({params}) {
     ${orph.owned.slice(0, 3).map(r => `<button class="btn btn-sm" data-doc-edit="${r.id}">${icon('edit', 14)}Classer la ligne ${r.id}</button>`).join('')}
   </div>` : ''}
   ${statesCard()}
-  <section class="grid g-docs mt">
-    <aside class="card card-pad doc-facets">
-      <p class="menu-label" style="padding:0 0 8px">Type</p>
-      <button class="facet" aria-pressed="${!st.type}" data-type="">Tous <span class="num">${all.length}</span></button>
-      ${types.map(t => `<button class="facet" aria-pressed="${st.type === t}" data-type="${attr(t)}"><span>${icon(typeIcon(t), 15)}${esc(t)}</span><span class="num">${all.filter(d => d.type === t).length}</span></button>`).join('')}
-      <p class="menu-label" style="padding:16px 0 8px">Exercice</p>
-      <div class="me-people" style="padding:0">${['', ...ys].map(y => `<button class="chip" aria-pressed="${st.year === String(y)}" data-dyear="${y}">${y || 'Tous'}</button>`).join('')}</div>
-    </aside>
-    <article class="card">
-      <div class="toolbar card-toolbar">
-        <label class="search-field" style="max-width:none">${icon('search', 16)}<input class="input" type="search" placeholder="Rechercher un document…" value="${attr(st.q)}" data-keep="doc-q" aria-label="Rechercher un document"></label>
-        <span class="muted result-count">${docs.length} document(s)</span>
-      </div>
-      <div class="doc-list" data-docs>${items(docs)}</div>
-    </article>
-  </section>
+  <article class="card mt doc-card">
+    <div class="card-head"><div><p class="card-eyebrow">Toutes les pièces</p><h2>Classées par exercice</h2></div>
+      <label class="search-field doc-search">${icon('search', 16)}<input class="input" type="search" placeholder="Rechercher un document…" value="${attr(st.q)}" data-keep="doc-q" aria-label="Rechercher un document"></label></div>
+    <div class="doc-filters">
+      <div class="doc-filter-row" role="group" aria-label="Type de document"><span class="doc-filter-l">Type</span>
+        <button class="chip" aria-pressed="${!st.type}" data-type="">Tous <span class="chip-n">${all.length}</span></button>
+        ${types.map(t => `<button class="chip" aria-pressed="${st.type === t}" data-type="${attr(t)}">${esc(t)} <span class="chip-n">${all.filter(d => d.type === t).length}</span></button>`).join('')}</div>
+      <div class="doc-filter-row" role="group" aria-label="Exercice"><span class="doc-filter-l">Exercice</span>
+        ${['', ...ys].map(y => `<button class="chip" aria-pressed="${st.year === String(y)}" data-dyear="${y}">${y || 'Tous'}</button>`).join('')}
+        <span class="muted result-count">${docs.length} document(s)</span></div>
+    </div>
+    <div class="doc-list" data-docs>${items(docs)}</div>
+  </article>
   <input type="file" hidden data-file>`;
 }
 
@@ -128,6 +141,47 @@ async function deleteOrphans() {
       try { await act(backup.map(b => ['AddRecord', 'Documents_Fiscaux', null, b])); toast('Lignes restaurées', 'info'); } catch (err) { toast(err.message, 'error'); }
     }});
   } catch (err) { toast(err.message, 'error'); }
+}
+
+/* Toutes les pièces d'un état pour un exercice (ex. les EDET mensuels).
+   L'étoile désigne le récapitulatif annuel : il passe en tête, pour toute l'équipe. */
+function stateDrawer(type, year) {
+  const pieces = M.sortPieces(M.documents().filter(d => d.type === type && d.year === year));
+  if (!pieces.length) { closeDrawer(); return; }
+  const hasRecap = pieces.some(M.isRecap);
+  openDrawer({
+    id: `state:${type}:${year}`, title: `${esc(type)} ${year}`, subtitle: `${pieces.length} pièce${pieces.length > 1 ? 's' : ''} · ${hasRecap ? 'récapitulatif annuel en tête' : 'dans l’ordre des mois'}`,
+    body: `${hasRecap ? '' : `<div class="notice">${icon('info', 16)}<span>Désignez avec l’étoile la pièce qui récapitule l’année : elle passera en tête et sera signalée dans la grille.</span></div>`}
+      <div class="piece-list">${pieces.map(d => {
+        const ids = attachmentIds(d.file), m = M.docMonth(d.title), rec = M.isRecap(d);
+        return `<div class="piece${rec ? ' is-recap' : ''}">
+          <span class="piece-month">${rec ? icon('check', 16) : m ? esc(cap(M.MONTHS[m - 1]).slice(0, 4)) + (M.MONTHS[m - 1].length > 4 ? '.' : '') : '—'}</span>
+          <span class="row-main"><b>${esc(d.title)}</b><span>${esc([rec ? 'Récapitulatif annuel' : '', fmt.size(d.size), d.added ? `ajouté ${fmt.date(d.added)}` : ''].filter(Boolean).join(' · '))}</span></span>
+          ${ids.length ? `<button class="btn btn-sm${rec ? ' btn-primary' : ''}" data-att="${ids[0]}">${icon('external', 14)}Ouvrir</button>` : d.link ? `<a class="btn btn-sm" href="${attr(d.link)}" target="_blank" rel="noopener noreferrer">${icon('external', 14)}Lien</a>` : '<span class="muted">Sans fichier</span>'}
+          <button class="icon-btn piece-star${rec ? ' on' : ''}" data-recap="${d.rowId}" aria-pressed="${rec}" aria-label="${rec ? 'Retirer le statut de récapitulatif annuel' : 'Désigner comme récapitulatif annuel'}" data-tip="${rec ? 'Retirer le récapitulatif' : 'Récapitulatif annuel'}">${icon('target', 15)}</button>
+          <button class="icon-btn" data-piece-edit="${d.rowId}" aria-label="Modifier ${attr(d.title)}" data-tip="Modifier">${icon('edit', 15)}</button>
+        </div>`;
+      }).join('')}</div>`,
+    footer: `<button class="btn btn-ghost" data-close>Fermer</button><button class="btn btn-primary" data-piece-add>${icon('upload', 16)}Ajouter une pièce ${esc(type)} ${year}</button>`,
+    onMount(el) {
+      el.addEventListener('click', async e => {
+        const att = e.target.closest('[data-att]');
+        if (att) { openAttachment(Number(att.dataset.att)).catch(err => toast(err.message, 'error')); return; }
+        const ed = e.target.closest('[data-piece-edit]');
+        if (ed) { editDrawer(Number(ed.dataset.pieceEdit)); return; }
+        if (e.target.closest('[data-piece-add]')) { preset = {type, year}; document.querySelector('[data-file]')?.click(); return; }
+        const star = e.target.closest('[data-recap]');
+        if (!star) return;
+        const id = Number(star.dataset.recap), on = star.getAttribute('aria-pressed') === 'true';
+        /* Un seul récapitulatif par état et par exercice. */
+        const actions = pieces.filter(d => M.isRecap(d) && d.rowId !== id).map(d => ['UpdateRecord', 'Documents_Fiscaux', d.rowId, {Statut: 'Classé'}]);
+        actions.push(['UpdateRecord', 'Documents_Fiscaux', id, {Statut: on ? 'Classé' : M.RECAP_STATUS}]);
+        star.disabled = true;
+        try { await act(actions); toast(on ? 'Récapitulatif retiré' : 'Récapitulatif annuel désigné'); stateDrawer(type, year); }
+        catch (err) { toast(err.message, 'error'); star.disabled = false; }
+      });
+    },
+  });
 }
 
 function uploadDrawer(file, given = null) {
@@ -174,7 +228,7 @@ function editDrawer(rowId) {
       ${field('Type', select('Type_Document', types, M.text(r.Type_Document) || 'Autre'))}
       ${field('Exercice', select('Exercice', [['', '—'], ...years], M.num(r.Exercice) || ''))}
       ${field('Version', `<input name="Version" value="${attr(M.text(r.Version))}">`)}
-      ${field('Statut', select('Statut', ['Classé', 'À vérifier', 'Archivé'], M.text(r.Statut) || 'Classé'))}
+      ${field('Statut', select('Statut', [...new Set(['Classé', M.RECAP_STATUS, 'À vérifier', 'Archivé', M.text(r.Statut)].filter(Boolean))], M.text(r.Statut) || 'Classé'))}
       <div class="span-2">${field('Lien (facultatif)', `<input name="Lien" value="${attr(M.text(r.Lien))}" placeholder="https://…">`)}</div>
     </form>
     <p class="form-section">Fichier</p>
@@ -251,6 +305,8 @@ export function mount(root) {
     const ed = e.target.closest('[data-doc-edit]');
     if (ed) { editDrawer(Number(ed.dataset.docEdit)); return; }
     if (e.target.closest('[data-orph-del]')) { deleteOrphans(); return; }
+    const so = e.target.closest('[data-state-open]');
+    if (so) { const [type, year] = so.dataset.stateOpen.split('|'); stateDrawer(type, Number(year)); return; }
     const su = e.target.closest('[data-state-upload]');
     if (su) { const [type, year] = su.dataset.stateUpload.split('|'); preset = {type, year: Number(year)}; root.querySelector('[data-file]').click(); return; }
     if (e.target.closest('[data-upload]')) { preset = null; root.querySelector('[data-file]').click(); }

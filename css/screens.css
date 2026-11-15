@@ -334,3 +334,28 @@ body.no-enter .siret-ok { animation: none; }
 .rate-period-y { font-variant-numeric: tabular-nums; color: var(--ink-2); }
 @media (max-width: 640px) { .rate-facts { grid-template-columns: 1fr; } .rate-period { grid-template-columns: 1fr; gap: 2px; } .rate-seg { font-size: 11.5px; padding: 0 4px; } .rate-row { grid-template-columns: 52px 1fr; } .rate-axis { margin-left: 64px; } }
 @media print { .rate-open { display: none; } .rate-seg { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+
+/* Documents : liste par exercice, filtres en tête */
+.doc-card .card-head { align-items: center; }
+.doc-search { max-width: 320px; flex: 1; }
+.doc-filters { display: grid; gap: 8px; padding: 4px 20px 14px; border-bottom: 1px solid var(--line); }
+.doc-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.doc-filter-l { width: 62px; flex: none; font-size: 12px; font-weight: 600; color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; }
+.doc-filter-row .result-count { margin-left: auto; font-size: 12.5px; }
+.doc-card .doc-list { padding: 0 0 8px; }
+.doc-group-h { display: flex; align-items: baseline; justify-content: space-between; margin: 0; padding: 10px 20px; background: var(--sunk); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); position: sticky; top: var(--top-h, 0px); z-index: 1; }
+.doc-group-h > span:first-child { font-family: var(--serif); font-size: 19px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums lining-nums; }
+.doc-group-h .num { font-size: 12.5px; color: var(--ink-3); font-weight: 400; }
+.doc-group:first-child .doc-group-h { border-top: 0; }
+.doc-group .doc { padding: 11px 20px; }
+.doc-group .doc:first-of-type { border-top: 0; }
+.doc-type { width: 118px; flex: none; }
+.doc .row-main b { color: var(--ink); font-size: 14px; }
+.doc .row-main b .badge { margin-left: 6px; vertical-align: 1px; }
+.piece-list { display: grid; gap: 6px; margin-top: 12px; }
+.piece { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--surface-2); border: 1px solid transparent; }
+.piece.is-recap { background: var(--good-bg); border-color: color-mix(in srgb, var(--good) 35%, transparent); }
+.piece-month { width: 46px; flex: none; text-align: center; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.piece.is-recap .piece-month { color: var(--good); display: grid; place-items: center; }
+.piece-star.on { color: var(--good); }
+@media (max-width: 640px) { .doc-type { width: auto; } .doc-group .doc { flex-wrap: wrap; } .doc-filter-l { width: 100%; } .doc-search { max-width: none; } }

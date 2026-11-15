@@ -92,3 +92,11 @@ db.tables.Taxes = [];
 db.tables.Documents_Fiscaux = [{id: 9, Titre: 'Délibération VM 2024', Type_Document: 'Délibérations', Module: 'VM'}, {id: 10, Titre: 'Autre', Type_Document: 'Délibérations', Module: 'CFE'}];
 assert.deepEqual(M.rateDocs('VM').map(d => d.rowId), [9]);
 console.log('taux : tous les contrôles passent');
+
+// ── Pièces d'un état ──
+assert.equal(M.docMonth('EDET mars 2025'), 3); assert.equal(M.docMonth('EDET_2025-11.pdf'), 11);
+assert.equal(M.docMonth('edet 01/2026'), 1); assert.equal(M.docMonth('EDET Déc. 2025'), 12);
+assert.equal(M.docMonth('EDET 2025'), null); assert.equal(M.docMonth('Déclaration de recettes'), null); assert.equal(M.docMonth('Octroi de mer'), null); assert.equal(M.docMonth('EDET sept 2025'), 9); assert.equal(M.docMonth('Mairie de Mamoudzou'), null, '« mai » dans un mot n’est pas un mois');
+const P = (rowId, title, status = 'Classé') => ({rowId, title, status, added: new Date(2026, 0, rowId)});
+assert.deepEqual(M.sortPieces([P(1, 'EDET décembre'), P(2, 'EDET sans mois'), P(3, 'EDET janvier'), P(4, 'EDET juin', M.RECAP_STATUS)]).map(d => d.rowId), [4, 3, 1, 2]);
+console.log('pièces : tous les contrôles passent');
