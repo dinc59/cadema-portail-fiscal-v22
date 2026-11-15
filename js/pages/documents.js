@@ -4,6 +4,8 @@ import { esc, attr, icon, fmt, badge, empty, openDrawer, closeDrawer, toast, fie
 import { author } from '../main.js';
 
 const st = {q: '', type: '', year: ''};
+/* Type et exercice proposés quand on dépose depuis la grille des états. */
+let preset = null;
 const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 const typeIcon = t => /1259|1386|EDET|EDAC/.test(t) ? 'table' : /onvention|élib/i.test(t) ? 'edit' : /ourrier/i.test(t) ? 'mail' : 'file';
 
@@ -38,6 +40,36 @@ function items(docs) {
   }).join('');
 }
 
+/* Grille des états fiscaux : un exercice par ligne, un état par colonne.
+   Un état manquant d'un exercice clos est signalé ; l'exercice en cours
+   peut ne pas être encore notifié. */
+function statesCard() {
+  const current = new Date().getFullYear();
+  const grid = M.statesGrid(current);
+  const missing = M.missingStates(current);
+  const cell = (c, y) => {
+    if (c.docs.length) {
+      const d = c.docs[0], ids = attachmentIds(d.file);
+      const more = c.docs.length > 1 ? `<span class="sg-n">${c.docs.length} pièces</span>` : '';
+      const label = `${esc(c.type)} ${y}`;
+      if (ids.length) return `<button class="sg-c is-ok" data-att="${ids[0]}" aria-label="Ouvrir ${label}">${icon('check', 15)}<span>Ouvrir</span>${more}</button>`;
+      if (d.link) return `<a class="sg-c is-ok" href="${attr(d.link)}" target="_blank" rel="noopener noreferrer" aria-label="Ouvrir ${label}">${icon('external', 15)}<span>Lien</span>${more}</a>`;
+      return `<button class="sg-c is-ok" data-doc-edit="${d.rowId}" aria-label="${label} classé sans fichier">${icon('check', 15)}<span>Sans fichier</span>${more}</button>`;
+    }
+    const closed = y < current;
+    return `<button class="sg-c ${closed ? 'is-missing' : 'is-pending'}" data-state-upload="${attr(`${c.type}|${y}`)}" aria-label="Déposer ${esc(c.type)} ${y}">${icon(closed ? 'alert' : 'upload', 15)}<span>${closed ? 'Manquant' : 'À recevoir'}</span></button>`;
+  };
+  return `<article class="card mt states-card">
+    <div class="card-head"><div><p class="card-eyebrow">États fiscaux</p><h2>1259, 1386, EDET et EDAC par exercice</h2>
+      <p class="card-sub">Cliquez un état présent pour l’ouvrir, un état manquant pour le déposer directement au bon exercice.</p></div>
+      ${missing.length ? badge(`${missing.length} manquant${missing.length > 1 ? 's' : ''}`, 'warn') : badge('Complet', 'good')}</div>
+    <div class="card-body"><div class="states-grid" role="table" aria-label="États fiscaux par exercice">
+      <span class="sg-h" role="columnheader">Exercice</span>${M.STATE_TYPES.map(t => `<span class="sg-h" role="columnheader">${esc(t)}</span>`).join('')}
+      ${grid.map(r => `<span class="sg-y" role="rowheader">${r.year}</span>${r.cells.map(c => cell(c, r.year)).join('')}`).join('')}
+    </div></div>
+  </article>`;
+}
+
 export function render({params}) {
   st.q = params.get('q') || st.q;
   const all = M.documents();
@@ -63,7 +95,8 @@ export function render({params}) {
       <span>Ces lignes portent un fichier qui n’est classé nulle part ailleurs : donnez-leur un titre et un type.</span></span>
     ${orph.owned.slice(0, 3).map(r => `<button class="btn btn-sm" data-doc-edit="${r.id}">${icon('edit', 14)}Classer la ligne ${r.id}</button>`).join('')}
   </div>` : ''}
-  <section class="grid g-docs">
+  ${statesCard()}
+  <section class="grid g-docs mt">
     <aside class="card card-pad doc-facets">
       <p class="menu-label" style="padding:0 0 8px">Type</p>
       <button class="facet" aria-pressed="${!st.type}" data-type="">Tous <span class="num">${all.length}</span></button>
@@ -97,14 +130,15 @@ async function deleteOrphans() {
   } catch (err) { toast(err.message, 'error'); }
 }
 
-function uploadDrawer(file) {
+function uploadDrawer(file, given = null) {
   const y = new Date().getFullYear();
+  const years = [...new Set([...Array.from({length: 8}, (_, i) => y + 1 - i), given?.year].filter(Boolean))].sort((a, b) => b - a);
   openDrawer({
     title: 'Classer le document', subtitle: esc(file.name),
     body: `<form class="form-grid" id="doc-form">
       <div class="span-2">${field('Titre', `<input name="Titre" value="${attr(file.name)}" required>`)}</div>
-      ${field('Type', select('Type_Document', M.DOC_TYPES, '1259'))}
-      ${field('Exercice', select('Exercice', Array.from({length: 8}, (_, i) => y + 1 - i), y))}
+      ${field('Type', select('Type_Document', M.DOC_TYPES, given?.type || '1259'))}
+      ${field('Exercice', select('Exercice', years, given?.year || y))}
       <div class="span-2 notice">${icon('info', 16)}<span>Le fichier est envoyé dans les pièces jointes du document Grist, puis une ligne est ajoutée à Documents_Fiscaux.</span></div>
     </form>`,
     footer: `<button class="btn btn-ghost" data-close>Annuler</button><button class="btn btn-primary" data-send>${icon('upload', 16)}Envoyer dans Grist</button>`,
@@ -217,9 +251,11 @@ export function mount(root) {
     const ed = e.target.closest('[data-doc-edit]');
     if (ed) { editDrawer(Number(ed.dataset.docEdit)); return; }
     if (e.target.closest('[data-orph-del]')) { deleteOrphans(); return; }
-    if (e.target.closest('[data-upload]')) root.querySelector('[data-file]').click();
+    const su = e.target.closest('[data-state-upload]');
+    if (su) { const [type, year] = su.dataset.stateUpload.split('|'); preset = {type, year: Number(year)}; root.querySelector('[data-file]').click(); return; }
+    if (e.target.closest('[data-upload]')) { preset = null; root.querySelector('[data-file]').click(); }
   });
-  root.querySelector('[data-file]').addEventListener('change', e => { const file = e.target.files[0]; e.target.value = ''; if (file) uploadDrawer(file); });
+  root.querySelector('[data-file]').addEventListener('change', e => { const file = e.target.files[0]; e.target.value = ''; if (file) uploadDrawer(file, preset); preset = null; });
   /* Déposer un fichier n'importe où sur la page. */
   root.addEventListener('dragover', e => { if (e.dataTransfer?.types.includes('Files')) { e.preventDefault(); root.classList.add('is-drop'); } });
   root.addEventListener('dragleave', e => { if (e.target === root) root.classList.remove('is-drop'); });

@@ -320,6 +320,11 @@ export function quality(year) {
     ok: !noTrack.length, count: noTrack.length, detail: noTrack.slice(0, 6).map(x => x.name).join(' · '),
     fix: 'Ouvrir la fiche et créer le suivi de l’exercice.', route: `#/redevance?situation=${encodeURIComponent('Sans suivi')}`, ratio: rs.list.length ? noTrack.length / rs.list.length : 0});
 
+  const lostStates = missingStates(year).filter(s => Number(s.slice(-4)) >= year - 3);
+  add({id: 'states', level: 'warn', title: 'États fiscaux absents (1259, 1386, EDET, EDAC)',
+    ok: !lostStates.length, count: lostStates.length, detail: lostStates.join(' · '),
+    fix: 'Les déposer depuis la grille des états fiscaux, dans Documents.', route: '#/documents', ratio: lostStates.length / (STATE_TYPES.length * 3)});
+
   const orphanDocs = rows('Documents_Fiscaux').filter(r => !text(r.Titre));
   add({id: 'doc-orphans', level: 'info', title: 'Lignes documentaires vides',
     ok: !orphanDocs.length, count: orphanDocs.length, detail: `${orphanDocs.length} ligne(s) sans titre ni type dans Documents_Fiscaux`,
@@ -347,4 +352,110 @@ export function quality(year) {
   return {checks, score: total ? Math.round(passed / total * 100) : 100,
     open: checks.filter(c => !c.ok).length,
     critical: checks.filter(c => !c.ok && c.level === 'critical').length};
+}
+
+/* ── Recettes par budget ───────────────────────────────────────────── */
+/* Les trois budgets de la CADEMA. Chaque recette est rattachée à un budget :
+   par défaut selon le tableau ci-dessous, ou selon la table Parametres
+   (Cle « BUDGET_TEOM », Valeur « Déchets ») si la comptabilité veut corriger
+   un rattachement sans toucher au code. */
+export const BUDGETS = [
+  {key: 'Principal', label: 'Budget principal', slot: 1},
+  {key: 'Déchets', label: 'Budget annexe déchets', slot: 3},
+  {key: 'Mobilité', label: 'Budget annexe mobilité', slot: 4},
+];
+const DEFAULT_BUDGET = {CFE: 'Principal', COMP: 'Principal', TASCOM: 'Principal', IFER: 'Principal', DGF: 'Principal', FPIC: 'Principal',
+  TEOM: 'Déchets', RS: 'Déchets', VM: 'Mobilité'};
+export function matchBudget(value) {
+  const v = text(value).toLowerCase();
+  if (!v) return null;
+  if (/d[ée]chet|ordure|teom|environn/.test(v)) return 'Déchets';
+  if (/mobilit|transport/.test(v)) return 'Mobilité';
+  if (/princip|g[ée]n[ée]ral/.test(v)) return 'Principal';
+  return null;
+}
+export function budgetOf(code) {
+  return matchBudget(param(`BUDGET_${code}`)) || DEFAULT_BUDGET[code] || 'Principal';
+}
+
+/* DGF : si une ligne « Total » existe pour l'exercice, elle fait foi ;
+   sinon les lignes de l'exercice sont additionnées. */
+export function dgfTotal(year) {
+  const list = rows('DGF_Detail').filter(r => num(r.Exercice) === year && num(r.Montant) !== null);
+  if (!list.length) return null;
+  const total = list.find(r => /total/i.test(text(r.Intitule)));
+  if (total) return {amount: num(total.Montant), source: text(total.Source), lines: 1};
+  return {amount: list.reduce((s, r) => s + num(r.Montant), 0), source: [...new Set(list.map(r => text(r.Source)).filter(Boolean))].join(' · '), lines: list.length};
+}
+export function fpicEpci(year) {
+  const r = rows('FPIC_Repartition').find(x => num(x.Exercice) === year);
+  return r && num(r.Part_EPCI) !== null ? {amount: num(r.Part_EPCI), source: text(r.Source)} : null;
+}
+
+/* Une ligne par recette, pour un exercice : montant retenu, statut, source,
+   montant N-1 et, quand Produits_Recettes le dit, prévision et réalisé. */
+function revenueLine(code, year) {
+  const t = taxByCode(code);
+  if (t) {
+    const c = taxCell(code, year), prev = taxCell(code, year - 1), p = produit(code, year);
+    return {code, label: t.label, slot: t.slot, kind: 'fiscal', amount: c?.amount ?? null, status: c?.status || null,
+      source: c?.source || text(p?.Source), prev: prev?.amount ?? null,
+      forecast: p ? num(p.Prevision) : null, realised: p ? num(p.Realise) : null, href: `#/recettes/${code}`};
+  }
+  if (code === 'RS') {
+    const r = rsYear(year), q = rsYear(year - 1);
+    return {code, label: 'Redevance spéciale', kind: 'rs', amount: r.concerned ? r.billed : null, status: r.concerned ? 'Facturé' : null,
+      source: r.concerned ? `${r.concerned} dossier(s) suivi(s)` : '', prev: q.concerned ? q.billed : null,
+      paid: r.concerned ? r.paid : null, rest: r.concerned ? r.rest : null, rate: r.rate, href: '#/redevance'};
+  }
+  if (code === 'DGF') {
+    const d = dgfTotal(year), q = dgfTotal(year - 1);
+    return {code, label: 'Dotation globale de fonctionnement', kind: 'dotation', amount: d?.amount ?? null, status: d ? 'Notifié' : null,
+      source: d?.source || '', prev: q?.amount ?? null, href: '#/finances?tab=dotations'};
+  }
+  if (code === 'FPIC') {
+    const f = fpicEpci(year), q = fpicEpci(year - 1);
+    return {code, label: 'FPIC · part de l’EPCI', kind: 'dotation', amount: f?.amount ?? null, status: f ? 'Notifié' : null,
+      source: f?.source || '', prev: q?.amount ?? null, href: '#/finances?tab=dotations'};
+  }
+  return null;
+}
+
+export const REVENUE_CODES = [...TAXES.map(t => t.code), 'RS', 'DGF', 'FPIC'];
+
+export function revenueByBudget(year) {
+  return BUDGETS.map(b => {
+    const lines = REVENUE_CODES.filter(code => budgetOf(code) === b.key).map(code => revenueLine(code, year));
+    const known = lines.filter(l => l.amount !== null);
+    const total = known.reduce((s, l) => s + l.amount, 0);
+    /* Évolution à périmètre comparable : seules les recettes connues
+       les deux années comptent, sinon une donnée manquante passerait pour une baisse. */
+    const both = lines.filter(l => l.amount !== null && l.prev !== null);
+    const cur = both.reduce((s, l) => s + l.amount, 0), prev = both.reduce((s, l) => s + l.prev, 0);
+    return {...b, lines, total: known.length ? total : null, covered: known.length, expected: lines.length,
+      forecastShare: known.length ? known.filter(l => /pr[ée]vision/i.test(l.status || '')).length : 0,
+      delta: prev ? cur / prev - 1 : null, comparable: both.length};
+  });
+}
+
+/* ── États fiscaux par exercice ────────────────────────────────────── */
+export const STATE_TYPES = ['1259', '1386', 'EDET', 'EDAC'];
+export function statesGrid(lastYear) {
+  const docs = documents().filter(d => STATE_TYPES.includes(d.type) && d.year);
+  const first = Math.min(lastYear - 5, ...docs.map(d => d.year));
+  const out = [];
+  for (let y = lastYear; y >= first; y--) {
+    out.push({year: y, cells: STATE_TYPES.map(type => ({type, docs: docs.filter(d => d.type === type && d.year === y)}))});
+  }
+  return out;
+}
+/* Un état est attendu pour les exercices clos ; l'exercice en cours peut
+   ne pas être encore notifié. */
+export function missingStates(year) {
+  const list = [];
+  for (const row of statesGrid(year)) {
+    if (row.year >= year) continue;
+    for (const c of row.cells) if (!c.docs.length) list.push(`${c.type} ${row.year}`);
+  }
+  return list;
 }

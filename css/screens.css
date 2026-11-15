@@ -288,3 +288,22 @@ body.no-enter .siret-ok { animation: none; }
 /* ── Documents : modification ─────────────────────────────────────── */
 .doc .doc-edit { width: 30px; height: 30px; transition: opacity 150ms ease, background-color 150ms ease, color 150ms ease; }
 @media (hover: hover) and (pointer: fine) { .doc:not(:hover):not(:focus-within) .doc-edit { opacity: .4; } }
+
+/* Recettes par budget */
+.rb-kpi { cursor: pointer; gap: 8px; }
+.rb-kpi .rb-stack { margin: 4px 0 2px; height: 10px; }
+.rb-kpi:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.rb-card { scroll-margin-top: 90px; }
+.rb-table td .badge { white-space: nowrap; }
+
+/* États fiscaux par exercice */
+.states-grid { display: grid; grid-template-columns: 76px repeat(4, minmax(0, 1fr)); gap: 6px; }
+.states-grid .sg-h { font-size: 12px; font-weight: 600; color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; padding: 0 4px 2px; }
+.states-grid .sg-y { display: flex; align-items: center; font-family: var(--serif); font-size: 18px; font-variant-numeric: tabular-nums lining-nums; }
+.states-grid .sg-c { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 10px; border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--surface); font: inherit; font-size: 13px; color: var(--ink-2); text-align: left; cursor: pointer; transition: background 150ms ease, border-color 150ms ease; }
+.states-grid .sg-c.is-ok { background: var(--good-bg); border-color: transparent; color: var(--good); }
+.states-grid .sg-c.is-missing { border-style: dashed; color: var(--warn); }
+.states-grid .sg-c.is-pending { border-style: dashed; color: var(--ink-3); }
+.states-grid .sg-c .sg-n { margin-left: auto; font-size: 11.5px; opacity: .75; }
+@media (hover: hover) and (pointer: fine) { .states-grid .sg-c:hover { border-color: var(--line-2); background: var(--surface-2); } .states-grid .sg-c.is-ok:hover { filter: brightness(.97); background: var(--good-bg); } }
+@media (max-width: 640px) { .states-grid { grid-template-columns: 52px repeat(4, minmax(0, 1fr)); } .states-grid .sg-c span:not(.sg-ic) { display: none; } .states-grid .sg-c { justify-content: center; } }

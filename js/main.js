@@ -146,6 +146,7 @@ function menuPanel(kind) {
   }
   if (kind === 'finances') {
     return `<div class="mega mega-simple">
+      <a class="mega-link" href="#/finances?tab=recettes">${icon('chart')}<span><b>Recettes par budget</b><span>Principal, déchets, mobilité · export Excel</span></span></a>
       <a class="mega-link" href="#/finances">${icon('wallet')}<span><b>Budget &amp; CFU</b><span>Résultats par budget et section</span></span></a>
       <a class="mega-link" href="#/finances?tab=dotations">${icon('landmark')}<span><b>Dotations</b><span>DGF et péréquation FPIC</span></span></a>
     </div>`;
@@ -266,6 +267,8 @@ function paletteItems() {
     {kind: 'Page', label: 'Mode réunion', href: '#/reunion', ic: 'present'},
     {kind: 'Page', label: 'Point mensuel (PDF)', href: '#/rapport', ic: 'download'},
     {kind: 'Page', label: 'Dotations DGF & FPIC', href: '#/finances?tab=dotations', ic: 'landmark'},
+    {kind: 'Page', label: 'Recettes par budget', href: '#/finances?tab=recettes', ic: 'chart'},
+    {kind: 'Page', label: 'États fiscaux (1259, 1386, EDET, EDAC)', href: '#/documents', ic: 'table'},
     {kind: 'Page', label: 'Équipe & paramètres', href: '#/equipe', ic: 'users'},
     ...M.TAXES.map(t => ({kind: 'Recette', label: `${t.code} · ${t.label}`, href: `#/recettes/${t.code}`, ic: 'coins'})),
     ...M.companies().map(c => ({kind: 'Entreprise', label: c.name, sub: [c.activity, c.siret].filter(Boolean).join(' · '), href: `#/redevance/${encodeURIComponent(c.id)}`, ic: 'building'})),

@@ -3,6 +3,15 @@
    La plus récente en premier. `id` sert à savoir ce qu'un agent a déjà vu. */
 export const CHANGELOG = [
   {
+    id: '22.10', date: '2026-11-15', title: 'Recettes par budget et états fiscaux',
+    summary: 'Pour la comptabilité : les recettes rangées par budget, et les états fiscaux de chaque exercice d’un coup d’œil.',
+    items: [
+      {tag: 'Nouveau', text: 'Finances › Recettes par budget : budget principal, budget déchets (TEOM et redevance spéciale), budget mobilité (versement mobilité). Pour chaque recette : statut, montant de l’exercice précédent, évolution, exécution et source. Export Excel et copie du tableau.', href: '#/finances?tab=recettes'},
+      {tag: 'Nouveau', text: 'Documents : grille des états 1259, 1386, EDET et EDAC par exercice. Un état présent s’ouvre en un clic ; un état manquant se dépose directement au bon exercice.', href: '#/documents'},
+      {tag: 'Amélioré', text: 'Qualité des données : les états fiscaux absents des trois derniers exercices clos sont signalés.', href: '#/pilotage?tab=qualite'},
+    ],
+  },
+  {
     id: '22.9', date: '2026-11-14', title: 'Finitions : documents, clavier, téléphone',
     summary: 'Les documents se corrigent depuis le portail, et la navigation au clavier est plus sûre.',
     items: [
