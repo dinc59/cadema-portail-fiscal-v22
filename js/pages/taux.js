@@ -15,8 +15,9 @@ function summary(code, year) {
   const cur = hist[hist.length - 1];
   const known = hist.filter(p => p.rate !== null);
   const changes = known.length - 1;
-  const gap = hist.find(p => p.rate === null);
-  return {hist, cur, changes, gap, since: cur.rate !== null ? cur.from : null};
+  const gap = hist.find(p => p.rate === null && !p.absent);
+  const instituted = known[0]?.from ?? null;
+  return {hist, cur, changes, gap, instituted, since: cur.rate !== null ? cur.from : null};
 }
 
 export function render({year}) {
@@ -37,7 +38,7 @@ export function render({year}) {
         ${r.cur.rate === null ? badge('À compléter', 'warn') : r.changes === 0 && !r.gap ? badge('Inchangé', 'good') : badge(`${r.changes + 1} taux successifs`, 'info')}</span>
       <span class="rate-value">${esc(pct(r.cur.rate))}</span>
       <span class="rate-label">${esc(M.RATE_INFO[r.code].label)}</span>
-      <span class="rate-meta">${r.since ? `En vigueur depuis ${r.since}` : 'Taux en vigueur non renseigné'}${r.gap ? ` · ${esc(span(r.gap))} à compléter` : ''}</span>
+      <span class="rate-meta">${r.since ? `En vigueur depuis ${r.cur.effect ? esc(r.cur.effect) : r.since}` : 'Taux en vigueur non renseigné'}${r.changes > 0 && r.instituted ? ` · institué en ${r.instituted}` : ''}${r.gap ? ` · ${esc(span(r.gap))} à compléter` : ''}</span>
       <span class="rate-open">Historique et délibération ${icon('right', 14)}</span>
     </article>`).join('')}
   </section>
@@ -48,7 +49,7 @@ export function render({year}) {
     <div class="card-body">
       ${list.map(r => `<div class="rate-row">
         <span class="rate-row-name"><span class="sw" style="background:${color(r.code)}"></span>${esc(r.code)}</span>
-        <span class="rate-line">${r.hist.map(p => `<span class="rate-seg${p.rate === null ? ' is-unknown' : ''}" style="flex:${p.to - p.from + 1}${p.rate === null ? '' : `;--seg:${color(r.code)}`}" data-tip="${attr(`<b>${esc(r.code)} ${esc(span(p))}</b> · ${p.rate === null ? 'taux non renseigné' : esc(pct(p.rate))}${p.source ? `<br>${esc(p.source)}` : ''}`)}">${p.rate === null ? 'Non renseigné' : esc(pct(p.rate))}</span>`).join('')}</span>
+        <span class="rate-line">${r.hist.map(p => `<span class="rate-seg${p.absent ? ' is-absent' : p.rate === null ? ' is-unknown' : ''}${p.toConfirm ? ' is-unsure' : ''}" style="flex:${p.to - p.from + 1}${p.rate === null ? '' : `;--seg:${color(r.code)}`}" data-tip="${attr(`<b>${esc(r.code)} ${esc(span(p))}</b> · ${p.absent ? 'non institué' : p.rate === null ? 'taux non renseigné' : esc(pct(p.rate))}${p.toConfirm ? ' · à confirmer' : ''}${p.source ? `<br>${esc(p.source)}` : ''}`)}">${p.absent ? 'Non institué' : p.rate === null ? 'Non renseigné' : esc(pct(p.rate))}</span>`).join('')}</span>
       </div>`).join('')}
       <div class="rate-axis" style="--n:${n}"><span>${first}</span><span>${current}</span></div>
     </div>
@@ -70,9 +71,9 @@ function rateDrawer(code) {
         <div><dt>En vigueur depuis</dt><dd>${cur.rate === null ? 'Non renseigné' : cur.from}</dd></div>
       </dl>
       <p class="menu-label" style="padding:18px 0 8px">Historique</p>
-      <div class="rate-periods">${[...hist].reverse().map(p => `<div class="rate-period${p.rate === null ? ' is-unknown' : ''}">
-        <span class="rate-period-y">${esc(span(p))}</span><b>${p.rate === null ? 'Non renseigné' : esc(pct(p.rate))}</b>
-        <span class="muted">${p.rate === null ? 'Saisir le taux de ces exercices dans Recettes.' : esc(p.source)}${p.fromGrist ? ' ' + badge('Grist', 'neutral') : ''}</span></div>`).join('')}</div>
+      <div class="rate-periods">${[...hist].reverse().map(p => `<div class="rate-period${p.rate === null && !p.absent ? ' is-unknown' : ''}">
+        <span class="rate-period-y">${esc(span(p))}</span><b>${p.absent ? 'Non institué' : p.rate === null ? 'Non renseigné' : esc(pct(p.rate))}</b>
+        <span class="muted">${p.rate === null && !p.absent ? 'Saisir le taux de ces exercices dans Recettes.' : esc([p.effect ? `Depuis le ${p.effect}` : '', p.source].filter(Boolean).join(' · '))}${p.toConfirm ? ' ' + badge('À confirmer', 'warn') : ''}${p.fromGrist ? ' ' + badge('Grist', 'neutral') : ''}</span></div>`).join('')}</div>
       <p class="menu-label" style="padding:18px 0 8px">Délibération</p>
       ${docs.length ? docs.map(d => {
         const ids = attachmentIds(d.file);

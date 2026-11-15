@@ -469,7 +469,14 @@ export const FIRST_FISCAL_YEAR = 2016;
 export const RATE_REFERENCE = {
   CFE: [{from: 2016, rate: 18.04, source: 'Taux voté à la création de la CADEMA, inchangé depuis'}],
   TEOM: [{from: 2016, rate: 14.40, source: 'Taux voté à la création de la CADEMA, inchangé depuis'}],
-  VM: [{from: 2025, rate: 1.50, source: 'Délibération du 19 septembre 2024, effet au 1er janvier 2025 (Urssaf, lettre circulaire 2024-0000009)'}],
+  /* « toConfirm » : taux relevés sur une copie de la table Urssaf, pas sur la délibération. */
+  VM: [
+    {from: 2016, rate: null, absent: true, source: 'Versement mobilité pas encore institué'},
+    {from: 2019, rate: 0.20, effect: '1er octobre 2019', toConfirm: true, source: 'Institution du versement mobilité au 1er octobre 2019 (table des taux Urssaf, relevée sur une copie)'},
+    {from: 2021, rate: 0.60, effect: '1er janvier 2021', toConfirm: true, source: 'Table des taux Urssaf, relevée sur une copie'},
+    {from: 2022, rate: 0.90, effect: '1er janvier 2022', source: 'Table des taux Urssaf ; taux relevé de 0,90 % à 1,50 % en 2025'},
+    {from: 2025, rate: 1.50, effect: '1er janvier 2025', source: 'Délibération du 19 septembre 2024 (Urssaf, lettre circulaire 2024-0000009)'},
+  ],
 };
 export const RATE_INFO = {
   CFE: {label: 'Cotisation foncière des entreprises', base: 'Valeur locative des biens professionnels', payer: 'Entreprises du territoire'},
@@ -494,7 +501,7 @@ export function rateFor(code, year) {
     .map(r => parseRate(code, r.Taux)).find(v => v !== null);
   if (saisi !== undefined && saisi !== null) return {rate: saisi, origin: 'grist', source: 'Table Taxes du document Grist'};
   const ref = (RATE_REFERENCE[code] || []).filter(p => p.from <= year).sort((a, b) => b.from - a.from)[0];
-  return ref ? {rate: ref.rate, origin: 'reference', source: ref.source} : null;
+  return ref ? {rate: ref.rate, origin: 'reference', source: ref.source, absent: !!ref.absent, toConfirm: !!ref.toConfirm, effect: ref.from === year ? ref.effect : ''} : null;
 }
 
 /* Périodes successives à taux constant, de la création à l'exercice demandé.
@@ -505,8 +512,9 @@ export function rateHistory(code, toYear) {
     const r = rateFor(code, y);
     const last = out[out.length - 1];
     const rate = r ? r.rate : null;
-    if (last && last.rate === rate) { last.to = y; if (r?.origin === 'grist') last.fromGrist = true; continue; }
-    out.push({from: y, to: y, rate, source: r?.source || '', fromGrist: r?.origin === 'grist'});
+    const absent = !!r?.absent;
+    if (last && last.rate === rate && last.absent === absent) { last.to = y; if (r?.origin === 'grist') last.fromGrist = true; continue; }
+    out.push({from: y, to: y, rate, absent, toConfirm: !!r?.toConfirm, effect: r?.effect || '', source: r?.source || '', fromGrist: r?.origin === 'grist'});
   }
   return out;
 }
