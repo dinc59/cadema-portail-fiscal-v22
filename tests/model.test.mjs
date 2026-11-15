@@ -100,3 +100,12 @@ assert.equal(M.docMonth('EDET 2025'), null); assert.equal(M.docMonth('Déclarati
 const P = (rowId, title, status = 'Classé') => ({rowId, title, status, added: new Date(2026, 0, rowId)});
 assert.deepEqual(M.sortPieces([P(1, 'EDET décembre'), P(2, 'EDET sans mois'), P(3, 'EDET janvier'), P(4, 'EDET juin', M.RECAP_STATUS)]).map(d => d.rowId), [4, 3, 1, 2]);
 console.log('pièces : tous les contrôles passent');
+
+// ── Qui a payé ──
+assert.equal(M.payStatus({situation: 'Soldée', billed: 100, paid: 100}), 'paye');
+assert.equal(M.payStatus({situation: 'Titre émis', billed: 100, paid: 0}), 'rien');
+assert.equal(M.payStatus({situation: 'Titre émis', billed: 100, paid: null}), 'rien', 'aucun règlement saisi = rien payé');
+assert.equal(M.payStatus({situation: 'Partiellement réglée', billed: 100, paid: 40}), 'partiel');
+assert.equal(M.payStatus({situation: 'À vérifier', billed: null, paid: null}), 'qualifier', 'sans montant facturé : inconnu, pas « payé »');
+assert.equal(M.payStatus({situation: 'Sans suivi', billed: null}), 'qualifier');
+console.log('paiements : tous les contrôles passent');

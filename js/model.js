@@ -545,3 +545,33 @@ export function sortPieces(docs) {
     || ((docMonth(a.title) ?? 99) - (docMonth(b.title) ?? 99))
     || ((b.added?.getTime() || 0) - (a.added?.getTime() || 0)));
 }
+
+/* ── Qui a payé la redevance d'un exercice ─────────────────────────── */
+/* Par entreprise suivie (hors « Non concernée ») :
+   - payé : réglé ≥ facturé ;  - partiel : réglé entre 0 et le facturé ;
+   - rien payé : facturé, aucun règlement ;
+   - à qualifier : pas de suivi pour l'exercice, ou aucun montant facturé —
+     ces entreprises ne pèsent pas dans le taux de recouvrement, d'où leur décompte à part. */
+export const PAY_GROUPS = [
+  {key: 'rien', label: 'Rien payé', tone: 'critical'},
+  {key: 'partiel', label: 'Payé en partie', tone: 'serious'},
+  {key: 'paye', label: 'Payé', tone: 'good'},
+  {key: 'qualifier', label: 'À qualifier', tone: 'warn'},
+];
+export function payStatus(x) {
+  if (x.situation === 'Sans suivi' || !(x.billed > 0)) return 'qualifier';
+  const paid = x.paid || 0;
+  if (paid >= x.billed) return 'paye';
+  return paid > 0 ? 'partiel' : 'rien';
+}
+export function rsPayments(year) {
+  const d = rsYear(year);
+  const list = d.list.filter(x => x.situation !== 'Non concernée').map(x => ({...x, pay: payStatus(x)}));
+  const by = Object.fromEntries(PAY_GROUPS.map(g => [g.key, list.filter(x => x.pay === g.key)]));
+  const sum = (arr, k) => arr.reduce((s, x) => s + (x[k] || 0), 0);
+  const known = by.rien.length + by.partiel.length + by.paye.length;
+  return {...d, list, by, total: list.length,
+    unpaid: {count: by.rien.length, amount: sum(by.rien, 'billed')},
+    partial: {count: by.partiel.length, rest: sum(by.partiel, 'rest')},
+    upToDate: known ? by.paye.length / known : null};
+}
