@@ -1,6 +1,6 @@
 /* Lecture métier des tables. Fonctions pures : elles ne lisent que `rows()`
    et n'inventent aucune valeur — un montant absent reste absent. */
-import { rows } from './grist.js';
+import { rows, db } from './grist.js';
 
 /* Ordre fixe des produits = ordre fixe des couleurs (palette validée,
    jamais recyclée selon le rang). */
@@ -344,6 +344,35 @@ export function quality(year) {
     ok: !fpic.length, count: fpic.length, detail: fpic.map(r => `FPIC ${num(r.Exercice)}`).join(' · '),
     fix: 'Saisir les parts EPCI et communes dès la notification.', route: '#/finances', ratio: rows('FPIC_Repartition').length ? fpic.length / rows('FPIC_Repartition').length : 0});
 
+  /* Suivi annuel RS : une seule ligne par entreprise et par exercice,
+     sinon les totaux n'en comptent qu'une et l'écart passe inaperçu. */
+  const names = new Map(companies().map(c => [c.id, c.name]));
+  const groups = new Map();
+  for (const r of rows('Suivi_RS_Annuel')) {
+    const k = `${text(r.Entreprise_ID)}|${num(r.Exercice)}`;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(r);
+  }
+  const rsDupes = [...groups.entries()].filter(([, l]) => l.length > 1);
+  add({id: 'rs-dupes', level: 'critical', title: 'Suivis de redevance en double',
+    ok: !rsDupes.length, count: rsDupes.length,
+    detail: rsDupes.slice(0, 6).map(([k, l]) => { const [e, y] = k.split('|'); return `${names.get(e) || e} ${y} (${l.length} lignes)`; }).join(' · '),
+    fix: 'Une seule ligne par entreprise et par exercice dans Suivi_RS_Annuel : fusionner les montants puis supprimer les autres lignes dans Grist. Les totaux n’en comptent qu’une.',
+    route: '#/redevance', ratio: groups.size ? rsDupes.length / groups.size : 0});
+  /* Trop-perçu : légitime parfois (avoir, régularisation), mais toujours à vérifier. */
+  const over = rows('Suivi_RS_Annuel').filter(r => num(r.Montant_Facture) !== null && num(r.Montant_Regle) !== null && num(r.Montant_Regle) > num(r.Montant_Facture) + 0.5);
+  add({id: 'rs-overpaid', level: 'warn', title: 'Redevance : réglé supérieur au facturé',
+    ok: !over.length, count: over.length,
+    detail: over.slice(0, 6).map(r => `${names.get(text(r.Entreprise_ID)) || text(r.Entreprise_ID)} ${num(r.Exercice)} (+${Math.round(num(r.Montant_Regle) - num(r.Montant_Facture)).toLocaleString('fr-FR')} €)`).join(' · '),
+    fix: 'Trop-perçu, avoir ou erreur de saisie : vérifier auprès du comptable public, puis corriger le montant ou le noter dans les observations.',
+    route: '#/redevance', ratio: rows('Suivi_RS_Annuel').length ? over.length / rows('Suivi_RS_Annuel').length : 0});
+  /* Une table non lue fait passer des montants pour absents. */
+  const missingTables = db.missing || [];
+  add({id: 'tables', level: 'critical', title: 'Tables Grist non chargées',
+    ok: !missingTables.length, count: missingTables.length, detail: missingTables.join(' · '),
+    fix: 'Vérifier que ces tables existent dans le document Grist, sous ce nom exact, et que le widget a l’accès complet. Les chiffres qui en dépendent sont incomplets.',
+    route: '#/pilotage?tab=qualite', ratio: missingTables.length ? 1 : 0});
+
   const weight = {critical: 3, warn: 2, info: 1};
   /* Chaque contrôle compte au prorata de ce qui est conforme (ex. 31 dossiers
      qualifiés sur 109 = 28 %), pondéré par sa gravité. */
@@ -575,3 +604,7 @@ export function rsPayments(year) {
     partial: {count: by.partiel.length, rest: sum(by.partiel, 'rest')},
     upToDate: known ? by.paye.length / known : null};
 }
+
+/* Un dossier ne passe en « Soldée » que si le règlement saisi couvre le
+   facturé : le statut ne crée jamais d'encaissement. */
+export const canSettle = x => num(x.billed) > 0 && (num(x.paid) || 0) >= num(x.billed);

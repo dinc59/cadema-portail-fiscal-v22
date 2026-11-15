@@ -259,12 +259,19 @@ export function formData(form) {
   return out;
 }
 
-export function downloadCsv(filename, header, lines) {
+export function csvText(header, lines) {
+  /* Une cellule qui commence par = + @ (ou - suivi d'autre chose qu'un
+     nombre) serait lue comme une formule par Excel : on la neutralise. */
   const cell = v => {
-    const s = v === null || v === undefined ? '' : String(v);
+    const raw = v === null || v === undefined ? '' : String(v);
+    const s = /^[=+@\t\r]/.test(raw) || /^-(?![\d.,\s]|$)/.test(raw) ? `'${raw}` : raw;
     return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const csv = '﻿' + [header, ...lines].map(r => r.map(cell).join(';')).join('\r\n');
+  return '﻿' + [header, ...lines].map(r => r.map(cell).join(';')).join('\r\n');
+}
+
+export function downloadCsv(filename, header, lines) {
+  const csv = csvText(header, lines);
   const url = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8'}));
   const a = Object.assign(document.createElement('a'), {href: url, download: filename});
   document.body.appendChild(a); a.click(); a.remove();

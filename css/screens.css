@@ -359,3 +359,8 @@ body.no-enter .siret-ok { animation: none; }
 .piece.is-recap .piece-month { color: var(--good); display: grid; place-items: center; }
 .piece-star.on { color: var(--good); }
 @media (max-width: 640px) { .doc-type { width: auto; } .doc-group .doc { flex-wrap: wrap; } .doc-filter-l { width: 100%; } .doc-search { max-width: none; } }
+
+/* Tables Grist non chargées */
+.notice-critical { background: var(--critical-bg); }
+.notice-critical .ic, .notice-critical b { color: var(--critical); }
+.missing-banner { margin-bottom: 16px; }

@@ -268,6 +268,11 @@ function bindFiche(el, id, year) {
       if (form.id === 'annual-form') {
         const v = formData(form);
         const billed = M.num(v.Montant_Facture), paid = M.num(v.Montant_Regle);
+        if (v.Situation === 'Soldée' && !M.canSettle({billed, paid})) {
+          toast(`« Soldée » impossible : le montant réglé (${fmt.eur(paid)}) ne couvre pas le facturé (${fmt.eur(billed)}). Saisissez le règlement constaté.`, 'error', {timeout: 8000});
+          btn.disabled = false; return;
+        }
+        if (billed !== null && paid !== null && paid > billed) toast(`Montant réglé supérieur au facturé (${fmt.eur(paid - billed)} de plus) : trop-perçu ou erreur de saisie ? Le dossier est signalé dans Qualité.`, 'info', {timeout: 8000});
         const toDate = s => s ? M.toGristDate(new Date(`${s}T00:00:00`)) : null;
         const fields = fieldsFor('Suivi_RS_Annuel', {
           Situation: v.Situation, Montant_Facture: billed, Montant_Regle: paid,
@@ -382,13 +387,21 @@ async function saveSiret(input) {
 }
 
 async function applyBulk(year, situation) {
-  const targets = M.rsYear(year).list.filter(x => sel.has(x.id));
-  if (!targets.length) return;
-  const n = targets.length;
+  const picked = M.rsYear(year).list.filter(x => sel.has(x.id));
+  if (!picked.length) return;
   const solde = situation === 'Soldée';
+  /* « Soldée » ne s'applique qu'aux dossiers dont le règlement saisi couvre
+     déjà le facturé : changer un statut ne doit jamais créer un encaissement. */
+  const targets = solde ? picked.filter(M.canSettle) : picked;
+  const blocked = solde ? picked.filter(x => !M.canSettle(x)) : [];
+  if (!targets.length) {
+    toast(`Aucun des ${picked.length} dossier${picked.length > 1 ? 's' : ''} ne peut passer en « Soldée » : le règlement saisi est inférieur au facturé ou absent. Saisissez d’abord le montant réglé constaté.`, 'info', {timeout: 9000});
+    return;
+  }
+  const n = targets.length;
   const ok = await confirmDialog({
     title: `Passer ${n} dossier${n > 1 ? 's' : ''} en « ${situation} » ?`,
-    message: `Situation ${year} de ${n > 3 ? `${targets.slice(0, 3).map(x => x.name).join(', ')} et ${n - 3} autre(s)` : targets.map(x => x.name).join(', ')}.${solde ? ' Le montant réglé sera égal au montant facturé et le reste à recouvrer mis à zéro.' : ''} Vous pourrez annuler juste après.`,
+    message: `Situation ${year} de ${n > 3 ? `${targets.slice(0, 3).map(x => x.name).join(', ')} et ${n - 3} autre(s)` : targets.map(x => x.name).join(', ')}.${blocked.length ? ` ${blocked.length} autre${blocked.length > 1 ? 's' : ''} dossier${blocked.length > 1 ? 's' : ''} sélectionné${blocked.length > 1 ? 's' : ''} ne ${blocked.length > 1 ? 'sont' : 'est'} pas soldé${blocked.length > 1 ? 's' : ''} : règlement saisi inférieur au facturé ou absent. Aucun montant n’est modifié.` : ''}${solde ? ' Seule la situation change : les montants saisis sont conservés.' : ''} Vous pourrez annuler juste après.`,
     confirm: 'Appliquer',
   });
   if (!ok) return;
@@ -396,10 +409,10 @@ async function applyBulk(year, situation) {
   const undo = [];
   const actions = targets.map(x => {
     const fields = {Situation: situation, Derniere_MAJ: now};
-    if (solde && x.billed !== null) { fields.Montant_Regle = x.billed; fields.Reste_A_Recouvrer = 0; }
+    if (solde) fields.Reste_A_Recouvrer = 0;
     if (x.annual) {
       const prev = {Situation: x.annual.Situation ?? null, Derniere_MAJ: x.annual.Derniere_MAJ ?? null};
-      if ('Montant_Regle' in fields) { prev.Montant_Regle = x.annual.Montant_Regle ?? null; prev.Reste_A_Recouvrer = x.annual.Reste_A_Recouvrer ?? null; }
+      if ('Reste_A_Recouvrer' in fields) prev.Reste_A_Recouvrer = x.annual.Reste_A_Recouvrer ?? null;
       undo.push(['UpdateRecord', 'Suivi_RS_Annuel', x.annual.id, fieldsFor('Suivi_RS_Annuel', prev)]);
       return ['UpdateRecord', 'Suivi_RS_Annuel', x.annual.id, fieldsFor('Suivi_RS_Annuel', fields)];
     }

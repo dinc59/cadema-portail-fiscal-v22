@@ -1,0 +1,12 @@
+{
+  "name": "cadema-portail-fiscal",
+  "private": true,
+  "type": "module",
+  "description": "Portail fiscal CADEMA — widget Grist. Seuls les tests utilisent npm ; le portail lui-même n'a aucune dépendance.",
+  "scripts": {
+    "test": "node tests/run.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3"
+  }
+}

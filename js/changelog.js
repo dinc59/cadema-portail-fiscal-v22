@@ -3,6 +3,16 @@
    La plus récente en premier. `id` sert à savoir ce qu'un agent a déjà vu. */
 export const CHANGELOG = [
   {
+    id: '22.14', date: '2026-11-15', title: 'Fiabilisation des données',
+    summary: 'Les chiffres financiers ne peuvent plus être faussés par un statut, un import ou une table manquante.',
+    items: [
+      {tag: 'Corrigé', text: 'Redevance spéciale : « Soldée » ne crée plus d’encaissement. Un dossier ne passe en Soldée que si le montant réglé saisi couvre le facturé ; les autres sont signalés et restent inchangés.', href: '#/redevance'},
+      {tag: 'Corrigé', text: 'Import CFE : chaque local est une ligne distincte, même quand une entreprise en occupe plusieurs avec le même SIRET. Réimporter un fichier met les locaux à jour sans les dupliquer.', href: '#/recettes/CFE?tab=terrain'},
+      {tag: 'Nouveau', text: 'Qualité des données : suivis de redevance en double, montants réglés supérieurs au facturé, et tables Grist non chargées (avec un bandeau d’alerte en haut de chaque page).', href: '#/pilotage?tab=qualite'},
+      {tag: 'Amélioré', text: 'Exports CSV : une cellule qui ressemble à une formule est neutralisée avant d’être ouverte dans Excel.'},
+    ],
+  },
+  {
     id: '22.13', date: '2026-11-15', title: 'Synthèse PDF de la redevance spéciale',
     summary: 'Un bouton produit la synthèse de l’exercice, avec ses graphiques, à vérifier à l’écran avant de l’enregistrer en PDF.',
     items: [

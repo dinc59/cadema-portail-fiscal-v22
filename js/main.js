@@ -380,7 +380,10 @@ export function render({keepScroll = false, enter = keepScroll ? 'none' : 'full'
   document.body.classList.toggle('no-enter', enter === 'none');
   document.body.classList.toggle('soft-enter', enter === 'soft');
   const ctx = {year: app.year, sub: app.route.sub, params: app.route.params, app, render};
-  root.innerHTML = `${header()}<main id="main" class="page page-${app.route.page}" tabindex="-1">${page.render(ctx)}</main>
+  const missingBanner = db.status === 'ready' && db.missing.length && !['fiche', 'rapport'].includes(app.route.page)
+    ? `<div class="notice notice-critical missing-banner" role="alert">${icon('alert', 16)}<span><b>${db.missing.length} table${db.missing.length > 1 ? 's' : ''} Grist non chargée${db.missing.length > 1 ? 's' : ''} : ${esc(db.missing.join(', '))}.</b> Les chiffres qui en dépendent sont incomplets : un montant absent n’est pas forcément nul.</span></div>`
+    : '';
+  root.innerHTML = `${header()}<main id="main" class="page page-${app.route.page}" tabindex="-1">${missingBanner}${page.render(ctx)}</main>
     <footer class="foot"><span>${LOGO.replace('logo-mark', 'logo-mark logo-sm')} Portail Fiscal CADEMA</span><span>Données : document Grist du pôle · lecture et écriture en direct · <a class="link" href="#/nouveautes">Nouveautés</a></span>${creditLine()}</footer>`;
   page.mount?.(root.querySelector('main'), ctx);
   moveIndicator(false);

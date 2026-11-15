@@ -109,3 +109,31 @@ assert.equal(M.payStatus({situation: 'Partiellement réglée', billed: 100, paid
 assert.equal(M.payStatus({situation: 'À vérifier', billed: null, paid: null}), 'qualifier', 'sans montant facturé : inconnu, pas « payé »');
 assert.equal(M.payStatus({situation: 'Sans suivi', billed: null}), 'qualifier');
 console.log('paiements : tous les contrôles passent');
+
+// ── Fiabilisation : doublons RS, trop-perçu, tables non chargées, Soldée ──
+db.tables.Entreprises_RS = [{id: 1, Entreprise_ID: 'e1', Raison_Sociale: 'Alpha'}, {id: 2, Entreprise_ID: 'e2', Raison_Sociale: 'Beta'}];
+db.tables.Suivi_RS_Annuel = [
+  {id: 1, Entreprise_ID: 'e1', Exercice: 2025, Montant_Facture: 100, Montant_Regle: 0},
+  {id: 2, Entreprise_ID: 'e1', Exercice: 2025, Montant_Facture: 100, Montant_Regle: 100},
+  {id: 3, Entreprise_ID: 'e2', Exercice: 2025, Montant_Facture: 100, Montant_Regle: 150},
+  {id: 4, Entreprise_ID: 'e2', Exercice: 2024, Montant_Facture: 100, Montant_Regle: 100.2}];
+db.missing = ['Budgets'];
+let q2 = M.quality(2026);
+const chk = id => q2.checks.find(c => c.id === id);
+assert.equal(chk('rs-dupes').ok, false); assert.match(chk('rs-dupes').detail, /Alpha 2025 \(2 lignes\)/);
+assert.equal(chk('rs-overpaid').count, 1, 'un écart de centimes n’est pas un trop-perçu'); assert.match(chk('rs-overpaid').detail, /Beta 2025 \(\+50 €\)/);
+assert.equal(chk('tables').ok, false); assert.match(chk('tables').detail, /Budgets/);
+db.missing = []; db.tables.Suivi_RS_Annuel = db.tables.Suivi_RS_Annuel.filter(r => r.id !== 2 && r.id !== 3);
+q2 = M.quality(2026);
+assert.ok(chk('rs-dupes').ok && chk('rs-overpaid').ok && chk('tables').ok);
+assert.equal(M.canSettle({billed: 100, paid: 100}), true);
+assert.equal(M.canSettle({billed: 100, paid: 99}), false);
+assert.equal(M.canSettle({billed: 100, paid: null}), false, 'pas de règlement saisi : pas de solde');
+assert.equal(M.canSettle({billed: null, paid: null}), false);
+console.log('fiabilisation : tous les contrôles passent');
+
+// ── Export CSV ──
+const U = await import(`${repo}/js/ui.js`);
+const csv = U.csvText(['A'], [['=HYPERLINK("x")'], ['+33 6'], ['@SUM(1)'], ['-1200'], ['-2,5'], ['-cmd'], ['Texte; avec "guillemets"'], [1250.5], [null]]).slice(1).split('\r\n');
+assert.deepEqual(csv, ['A', `"'=HYPERLINK(""x"")"`, "'+33 6", "'@SUM(1)", '-1200', '-2,5', "'-cmd", '"Texte; avec ""guillemets"""', '1250.5', '']);
+console.log('export CSV : tous les contrôles passent');

@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+const repo = process.argv[2];
+await import(`${repo}/tests/dom-setup.mjs`);
+const {db} = await import(`${repo}/js/grist.js`);
+const main = await import(`${repo}/js/main.js`);
+db.status = 'ready'; db.missing = ['Budgets', 'CFU_Synthese']; db.tables = {Parametres: [], Taxes: [], Documents_Fiscaux: []};
+location.hash = '#/redevance'; main.render();
+const b = document.querySelector('.missing-banner');
+assert.ok(b, 'bandeau présent'); assert.match(b.textContent, /2 tables Grist non chargées : Budgets, CFU_Synthese/);
+db.missing = []; main.render();
+assert.ok(!document.querySelector('.missing-banner'), 'bandeau absent quand tout est chargé');
+console.log('bandeau OK');

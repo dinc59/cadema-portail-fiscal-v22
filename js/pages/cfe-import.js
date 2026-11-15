@@ -1,7 +1,9 @@
 /* Import du suivi terrain CFE (Excel ou CSV) vers Etablissements_CFE.
    Trois temps dans un même tiroir : le fichier, les colonnes (devinées puis
-   corrigeables), l'aperçu et l'écriture. Une ligne déjà connue (même
-   identifiant ou même SIRET) est mise à jour au lieu d'être dupliquée.
+   corrigeables), l'aperçu et l'écriture. Un local est reconnu par son
+   identifiant, sinon par son SIRET complété de sa section, sa parcelle ou
+   son adresse : une entreprise peut occuper plusieurs locaux, chacun reste
+   une ligne distincte. Une ligne déjà connue est mise à jour, jamais dupliquée.
    L'import entier peut être annulé juste après. */
 import * as M from '../model.js';
 import { rows, act, fieldsFor, refresh } from '../grist.js';
@@ -69,7 +71,17 @@ function convert(key, v) {
   return typeof v === 'string' ? v : String(v);
 }
 
-const keyOf = rec => rec.Etablissement_ID ? `id:${norm(rec.Etablissement_ID)}` : digits(rec.SIRET).length === 14 ? `siret:${digits(rec.SIRET)}` : null;
+/* Clé d'un local : SIRET + emplacement (section et parcelle, sinon adresse).
+   Sans emplacement, la clé est le SIRET seul : plusieurs locaux peuvent la
+   partager, ils sont alors rapprochés dans l'ordre (voir plan()). */
+export function localKey(rec) {
+  const d = digits(rec.SIRET);
+  if (d.length !== 14) return null;
+  const cad = [rec.Section, rec.Parcelle].map(v => norm(v ?? '')).filter(Boolean).join('-');
+  const where = cad || norm(rec.Adresse ?? '');
+  return `siret:${d}${where ? `|${where}` : ''}`;
+}
+const idKey = rec => rec.Etablissement_ID ? `id:${norm(rec.Etablissement_ID)}` : null;
 
 let state = null;
 
@@ -93,25 +105,56 @@ function preview() {
     <tbody>${recs.map(rec => `<tr>${keys.map(([k]) => `<td>${rec[k] === null ? '<span class="miss">—</span>' : esc(NUMERIC.has(k) && typeof rec[k] === 'number' ? fmt.eur(rec[k]) : rec[k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
 
-function plan() {
+/* Rapprochement fichier → table.
+   - Identifiant présent dans le fichier : il fait foi.
+   - Sinon, clé SIRET + emplacement. Quand plusieurs lignes du fichier ont la
+     même clé (une entreprise, plusieurs locaux sans adresse ni parcelle), la
+     n-ième ligne du fichier est rapprochée du n-ième local connu de cette
+     clé : aucun local n'est perdu, et réimporter le même fichier ne crée pas
+     de doublon.
+   - Seule une ligne strictement identique à une précédente est ignorée. */
+export function plan() {
   const {sheet, map} = state;
-  const existing = new Map();
-  for (const r of rows('Etablissements_CFE')) { const k = keyOf(r); if (k) existing.set(k, r); }
-  let add = 0, upd = 0, skip = 0;
-  const seen = new Set();
-  const items = [];
+  const byId = new Map(), byLocal = new Map();
+  for (const r of [...rows('Etablissements_CFE')].sort((a, b) => a.id - b.id)) {
+    const i = idKey(r); if (i) byId.set(i, r);
+    const l = localKey(r); if (l) { if (!byLocal.has(l)) byLocal.set(l, []); byLocal.get(l).push(r); }
+  }
+  const recs = [];
+  const sigs = new Set();
+  let skip = 0;
   for (const r of sheet.rows) {
     const rec = Object.fromEntries(Object.entries(map).map(([k, i]) => [k, convert(k, r[i])]));
     if (!Object.values(rec).some(v => v !== null)) { skip++; continue; }
-    const k = keyOf(rec);
-    if (k && seen.has(k)) { skip++; continue; }
-    if (k) seen.add(k);
-    const cur = k ? existing.get(k) : null;
+    const sig = JSON.stringify(rec);
+    if (sigs.has(sig)) { skip++; continue; }
+    sigs.add(sig);
+    recs.push(rec);
+  }
+  const perKey = new Map();
+  for (const rec of recs) { const l = !idKey(rec) && localKey(rec); if (l) perKey.set(l, (perKey.get(l) || 0) + 1); }
+  const occ = new Map(), taken = new Set();
+  let add = 0, upd = 0, shared = 0;
+  const items = [];
+  for (const rec of recs) {
+    let cur = null;
+    const i = idKey(rec);
+    if (i) cur = byId.get(i) || null;
+    else {
+      const l = localKey(rec);
+      if (l) {
+        const n = occ.get(l) || 0; occ.set(l, n + 1);
+        cur = (byLocal.get(l) || []).filter(r => !taken.has(r.id))[0] || null;
+        if (perKey.get(l) > 1) shared++;
+      }
+    }
+    if (cur) taken.add(cur.id);
     cur ? upd++ : add++;
     items.push({rec, cur});
   }
-  return {items, add, upd, skip};
+  return {items, add, upd, skip, shared};
 }
+export const _setState = s => { state = s; };
 
 function stepMap() {
   const {sheet, sheets, map, file} = state;
@@ -134,7 +177,8 @@ function stepMap() {
     <div class="import-plan mt" data-plan>
       <span><b class="num">${p.add}</b> à ajouter</span>
       <span><b class="num">${p.upd}</b> à mettre à jour</span>
-      <span class="muted"><b class="num">${p.skip}</b> ignorée(s) : vides ou en double dans le fichier</span>
+      <span class="muted"><b class="num">${p.skip}</b> ignorée(s) : vides ou strictement identiques dans le fichier</span>
+      ${p.shared ? `<span class="tone-warn"><b class="num">${p.shared}</b> locaux partagent un SIRET sans section, parcelle ni adresse : chacun est gardé, rapprochés dans l’ordre du fichier. Ajoutez une colonne d’adresse ou de parcelle pour les distinguer sûrement.</span>` : ''}
     </div>
     <p class="field-hint">Une ligne est reconnue comme déjà présente par son identifiant, sinon par son SIRET : elle est alors mise à jour, jamais dupliquée. La synthèse de campagne (CFE_Synthese) est recalculée.</p>`;
 }
