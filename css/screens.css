@@ -307,3 +307,28 @@ body.no-enter .siret-ok { animation: none; }
 .states-grid .sg-c .sg-n { margin-left: auto; font-size: 11.5px; opacity: .75; }
 @media (hover: hover) and (pointer: fine) { .states-grid .sg-c:hover { border-color: var(--line-2); background: var(--surface-2); } .states-grid .sg-c.is-ok:hover { filter: brightness(.97); background: var(--good-bg); } }
 @media (max-width: 640px) { .states-grid { grid-template-columns: 52px repeat(4, minmax(0, 1fr)); } .states-grid .sg-c span:not(.sg-ic) { display: none; } .states-grid .sg-c { justify-content: center; } }
+
+/* Taux votés */
+.rate-card { display: flex; flex-direction: column; gap: 6px; padding: 20px 22px; cursor: pointer; }
+.rate-card:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.rate-top { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.rate-top .badge { margin-left: auto; }
+.rate-value { font-family: var(--serif); font-size: 44px; font-weight: 500; letter-spacing: -.02em; line-height: 1.05; font-variant-numeric: tabular-nums lining-nums; margin-top: 6px; }
+.rate-label { color: var(--ink-2); font-size: 14px; }
+.rate-meta { color: var(--ink-3); font-size: 12.5px; }
+.rate-open { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; color: var(--accent); font-size: 13px; font-weight: 600; }
+.rate-row { display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 12px; margin-bottom: 10px; }
+.rate-row-name { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; }
+.rate-line { display: flex; gap: 3px; height: 34px; }
+.rate-seg { display: flex; align-items: center; justify-content: center; min-width: 0; padding: 0 8px; border-radius: 8px; overflow: hidden; white-space: nowrap; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;
+  background: color-mix(in srgb, var(--seg) 16%, var(--surface)); color: var(--ink); box-shadow: inset 3px 0 0 var(--seg); }
+.rate-seg.is-unknown { background: repeating-linear-gradient(135deg, transparent 0 5px, var(--line) 5px 6px); color: var(--warn); box-shadow: inset 0 0 0 1px var(--line-2); font-weight: 500; }
+.rate-axis { display: flex; justify-content: space-between; margin-left: 82px; color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+.rate-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.rate-facts dt { color: var(--ink-3); font-size: 12px; } .rate-facts dd { margin: 2px 0 0; font-weight: 600; }
+.rate-periods { display: grid; gap: 6px; }
+.rate-period { display: grid; grid-template-columns: 92px 76px 1fr; gap: 10px; align-items: baseline; padding: 10px 12px; border-radius: var(--r-sm); background: var(--surface-2); font-size: 13px; }
+.rate-period.is-unknown b { color: var(--warn); }
+.rate-period-y { font-variant-numeric: tabular-nums; color: var(--ink-2); }
+@media (max-width: 640px) { .rate-facts { grid-template-columns: 1fr; } .rate-period { grid-template-columns: 1fr; gap: 2px; } .rate-seg { font-size: 11.5px; padding: 0 4px; } .rate-row { grid-template-columns: 52px 1fr; } .rate-axis { margin-left: 64px; } }
+@media print { .rate-open { display: none; } .rate-seg { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }

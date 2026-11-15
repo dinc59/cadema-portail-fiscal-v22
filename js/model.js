@@ -459,3 +459,58 @@ export function missingStates(year) {
   }
   return list;
 }
+
+/* ── Taux votés ────────────────────────────────────────────────────── */
+/* Premier exercice fiscal : la CADEMA est créée le 31 décembre 2015
+   (arrêté préfectoral n° 2015-17602). */
+export const FIRST_FISCAL_YEAR = 2016;
+/* Taux de référence, utilisés seulement pour un exercice dont la table Taxes
+   ne porte pas de taux. Un taux saisi dans Grist l'emporte toujours. */
+export const RATE_REFERENCE = {
+  CFE: [{from: 2016, rate: 18.04, source: 'Taux voté à la création de la CADEMA, inchangé depuis'}],
+  TEOM: [{from: 2016, rate: 14.40, source: 'Taux voté à la création de la CADEMA, inchangé depuis'}],
+  VM: [{from: 2025, rate: 1.50, source: 'Délibération du 19 septembre 2024, effet au 1er janvier 2025 (Urssaf, lettre circulaire 2024-0000009)'}],
+};
+export const RATE_INFO = {
+  CFE: {label: 'Cotisation foncière des entreprises', base: 'Valeur locative des biens professionnels', payer: 'Entreprises du territoire'},
+  TEOM: {label: 'Taxe d’enlèvement des ordures ménagères', base: 'Base du foncier bâti', payer: 'Propriétaires de locaux, refacturée aux occupants'},
+  VM: {label: 'Versement mobilité', base: 'Masse salariale', payer: 'Employeurs de 11 salariés et plus'},
+};
+export const RATE_CODES = Object.keys(RATE_REFERENCE);
+
+/* La colonne Taux est libre dans Grist : « 18,04 % », 18.04 ou 0,1804.
+   Un nombre sans % sous le seuil de la taxe est lu comme une fraction. */
+export function parseRate(code, v) {
+  if (v === null || v === undefined || v === '') return null;
+  const n = typeof v === 'number' ? v : num(String(v).replace('%', ''));
+  if (n === null || n < 0) return null;
+  if (typeof v === 'string' && v.includes('%')) return n;
+  const fractionBelow = code === 'VM' ? 0.04 : 1;
+  return n < fractionBelow ? Math.round(n * 1e6) / 1e4 : n;
+}
+
+export function rateFor(code, year) {
+  const saisi = rows('Taxes').filter(r => text(r.Code).toUpperCase() === code && num(r.Exercice) === year)
+    .map(r => parseRate(code, r.Taux)).find(v => v !== null);
+  if (saisi !== undefined && saisi !== null) return {rate: saisi, origin: 'grist', source: 'Table Taxes du document Grist'};
+  const ref = (RATE_REFERENCE[code] || []).filter(p => p.from <= year).sort((a, b) => b.from - a.from)[0];
+  return ref ? {rate: ref.rate, origin: 'reference', source: ref.source} : null;
+}
+
+/* Périodes successives à taux constant, de la création à l'exercice demandé.
+   Une période sans taux connu reste visible (rate: null) : elle est à compléter. */
+export function rateHistory(code, toYear) {
+  const out = [];
+  for (let y = FIRST_FISCAL_YEAR; y <= toYear; y++) {
+    const r = rateFor(code, y);
+    const last = out[out.length - 1];
+    const rate = r ? r.rate : null;
+    if (last && last.rate === rate) { last.to = y; if (r?.origin === 'grist') last.fromGrist = true; continue; }
+    out.push({from: y, to: y, rate, source: r?.source || '', fromGrist: r?.origin === 'grist'});
+  }
+  return out;
+}
+
+export function rateDocs(code) {
+  return documents().filter(d => /d[ée]lib/i.test(d.type) && (text(d.module).toUpperCase() === code || new RegExp(`\\b${code}\\b`, 'i').test(d.title)));
+}

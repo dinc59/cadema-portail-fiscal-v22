@@ -14,6 +14,7 @@ import * as equipe from './pages/equipe.js';
 import * as nouveautes from './pages/nouveautes.js';
 import * as reunion from './pages/reunion.js';
 import * as rapport from './pages/rapport.js';
+import * as taux from './pages/taux.js';
 import { unseen } from './changelog.js';
 
 const store = {
@@ -42,7 +43,7 @@ const NAV = [
 export const CREDIT = '© 2026, Made with ❤️ by Dina-Ben';
 const creditLine = (cls = '') => `<p class="credit${cls ? ` ${cls}` : ''}">${CREDIT}</p>`;
 
-const PAGES = {accueil, recettes, redevance, finances, pilotage, documents, equipe, nouveautes, reunion, rapport};
+const PAGES = {accueil, recettes, redevance, finances, pilotage, documents, equipe, nouveautes, reunion, rapport, taux};
 
 /* Fonds disponibles. « Tamisé » est un sombre adouci, plus clair que « Sombre ». */
 const THEMES = [
@@ -139,6 +140,7 @@ function menuPanel(kind) {
       </div>
       <div class="mega-side">
         <a class="mega-link" href="#/recettes">${icon('chart')}<span><b>Vue d’ensemble</b><span>Toutes les recettes, tous les exercices</span></span></a>
+        <a class="mega-link" href="#/taux">${icon('target')}<span><b>Taux votés</b><span>CFE, TEOM, versement mobilité · historique et délibérations</span></span></a>
         <a class="mega-link" href="#/recettes/CFE?tab=terrain">${icon('map')}<span><b>CFE · suivi terrain</b><span>Visites, locaux exploités et vacants</span></span></a>
         <a class="mega-link" href="#/recettes/VM?tab=employeurs">${icon('building')}<span><b>VM · employeurs</b><span>Anomalies de déclaration</span></span></a>
       </div>
@@ -268,6 +270,7 @@ function paletteItems() {
     {kind: 'Page', label: 'Point mensuel (PDF)', href: '#/rapport', ic: 'download'},
     {kind: 'Page', label: 'Dotations DGF & FPIC', href: '#/finances?tab=dotations', ic: 'landmark'},
     {kind: 'Page', label: 'Recettes par budget', href: '#/finances?tab=recettes', ic: 'chart'},
+    {kind: 'Page', label: 'Taux votés (CFE, TEOM, VM)', href: '#/taux', ic: 'target'},
     {kind: 'Page', label: 'États fiscaux (1259, 1386, EDET, EDAC)', href: '#/documents', ic: 'table'},
     {kind: 'Page', label: 'Équipe & paramètres', href: '#/equipe', ic: 'users'},
     ...M.TAXES.map(t => ({kind: 'Recette', label: `${t.code} · ${t.label}`, href: `#/recettes/${t.code}`, ic: 'coins'})),

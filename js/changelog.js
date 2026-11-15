@@ -3,6 +3,15 @@
    La plus récente en premier. `id` sert à savoir ce qu'un agent a déjà vu. */
 export const CHANGELOG = [
   {
+    id: '22.11', date: '2026-11-15', title: 'Taux votés',
+    summary: 'Les taux de CFE, de TEOM et du versement mobilité, de la création de la CADEMA à aujourd’hui.',
+    items: [
+      {tag: 'Nouveau', text: 'Recettes › Taux votés : CFE 18,04 % et TEOM 14,40 % depuis 2016, versement mobilité 1,50 % depuis le 1er janvier 2025. Un clic sur un taux ouvre son historique, sa source et sa délibération en PDF.', href: '#/taux'},
+      {tag: 'Nouveau', text: 'La délibération d’un taux se dépose depuis sa fiche ; elle est rangée dans Documents et proposée à toute l’équipe.', href: '#/taux'},
+      {tag: 'Nouveau', text: 'Fiche des taux à imprimer ou enregistrer en PDF.', href: '#/taux'},
+    ],
+  },
+  {
     id: '22.10', date: '2026-11-15', title: 'Recettes par budget et états fiscaux',
     summary: 'Pour la comptabilité : les recettes rangées par budget, et les états fiscaux de chaque exercice d’un coup d’œil.',
     items: [

@@ -66,3 +66,28 @@ const q = M.quality(2026);
 const st = q.checks.find(c => c.id === 'states');
 assert.ok(st && !st.ok && st.detail.includes('EDET 2025'));
 console.log('model: tous les contrôles passent');
+
+// ── Taux votés ──
+db.tables.Taxes = [];
+assert.equal(M.parseRate('CFE', '18,04 %'), 18.04);
+assert.equal(M.parseRate('CFE', 0.1804), 18.04);
+assert.equal(M.parseRate('CFE', 18.04), 18.04);
+assert.equal(M.parseRate('VM', 0.015), 1.5, 'VM saisi en fraction');
+assert.equal(M.parseRate('VM', 1.5), 1.5);
+assert.equal(M.parseRate('VM', '0,55'), 0.55, 'un ancien taux VM de 0,55 % n’est pas lu comme 55 %');
+let h = M.rateHistory('CFE', 2026);
+assert.equal(h.length, 1); assert.deepEqual([h[0].from, h[0].to, h[0].rate], [2016, 2026, 18.04]);
+h = M.rateHistory('VM', 2026);
+assert.deepEqual(h.map(p => [p.from, p.to, p.rate]), [[2016, 2024, null], [2025, 2026, 1.5]], 'VM : période antérieure à compléter, jamais inventée');
+// Un taux saisi dans Grist l'emporte et crée une nouvelle période
+db.tables.Taxes = [{id: 1, Code: 'TEOM', Exercice: 2027, Taux: '15 %'}, {id: 2, Code: 'VM', Exercice: 2020, Taux: 0.0055}];
+h = M.rateHistory('TEOM', 2027);
+assert.deepEqual(h.map(p => [p.from, p.to, p.rate]), [[2016, 2026, 14.4], [2027, 2027, 15]]);
+assert.equal(h[1].fromGrist, true);
+h = M.rateHistory('VM', 2025);
+assert.deepEqual(h.map(p => [p.from, p.to, p.rate]), [[2016, 2019, null], [2020, 2020, 0.55], [2021, 2024, null], [2025, 2025, 1.5]]);
+db.tables.Taxes = [];
+// Délibérations rattachées à un taux
+db.tables.Documents_Fiscaux = [{id: 9, Titre: 'Délibération VM 2024', Type_Document: 'Délibérations', Module: 'VM'}, {id: 10, Titre: 'Autre', Type_Document: 'Délibérations', Module: 'CFE'}];
+assert.deepEqual(M.rateDocs('VM').map(d => d.rowId), [9]);
+console.log('taux : tous les contrôles passent');
