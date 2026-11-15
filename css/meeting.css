@@ -158,3 +158,39 @@ body.is-report {
 .credit-boot { position: fixed; left: 0; right: 0; bottom: 18px; text-align: center; font-size: 12px; color: var(--ink-3); }
 .report-credit { display: block; margin-top: 8px; text-align: center; }
 @media (hover: none) { .m-help { display: block; } .m-keys { display: none; } }
+
+/* ── Synthèses PDF (#/fiche) ───────────────────────────────────────── */
+.fiche-years { display: flex; gap: 4px; }
+.fiche .report-sec.is-long { break-inside: auto; }
+.fiche-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.fiche-svg .fs-l { font: 500 12px var(--font); fill: #44515b; }
+.fiche-svg .fs-v { font: 600 12px var(--font); fill: #14212b; font-variant-numeric: tabular-nums; }
+.fiche-svg .fs-n { font: 600 11px var(--font); fill: #44515b; font-variant-numeric: tabular-nums; }
+.fiche-svg .fs-y { font: 500 12px var(--font); fill: #66717a; } .fiche-svg .fs-y.on { font-weight: 700; fill: #14212b; }
+.fiche-svg .fs-axis { stroke: #d3cfc2; }
+.fiche-row { display: flex; gap: 28px; align-items: center; }
+.fiche-donut { width: 132px; flex: none; }
+.fiche-donut .fd-v { font: 600 21px var(--serif); fill: #14212b; } .fiche-donut .fd-l { font: 500 11px var(--font); fill: #66717a; }
+.fiche-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px 22px; flex: 1; margin-top: 12px; }
+.fiche-row .fiche-kpis { margin-top: 0; }
+.fiche-kpis div { display: grid; gap: 2px; padding-left: 12px; border-left: 3px solid #e3e0d6; }
+.fiche-kpis span { font-size: 11.5px; color: #66717a; text-transform: uppercase; letter-spacing: .05em; }
+.fiche-kpis b { font: 560 20px var(--serif); font-variant-numeric: tabular-nums lining-nums; }
+.fiche-kpis em { font-style: normal; font-size: 12px; color: #66717a; }
+.fiche-stack { display: flex; gap: 2px; height: 22px; border-radius: 6px; overflow: hidden; }
+.fiche-stack span { min-width: 3px; }
+.fiche-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 12.5px; color: #44515b; }
+.fiche-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.fiche-legend i, .fiche-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.fiche-dot { margin-right: 6px; vertical-align: -1px; }
+.fiche-legend b { font-variant-numeric: tabular-nums; } .fiche-legend em { font-style: normal; color: #66717a; }
+.fiche-note, .fiche-empty { font-size: 12.5px; color: #66717a; margin-top: 8px; }
+.fiche-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.fiche-table th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: #66717a; padding: 6px 8px; border-bottom: 1.5px solid #14212b; }
+.fiche-table td { padding: 6px 8px; border-bottom: 1px solid #e3e0d6; }
+.fiche-table .n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fiche-table tr { break-inside: avoid; }
+.fiche-table thead { display: table-header-group; }
+.fiche-table tfoot td { font-weight: 700; border-top: 1.5px solid #14212b; border-bottom: 0; }
+@media (max-width: 760px) { .report.fiche { padding: 24px 18px; } .fiche-row { flex-direction: column; align-items: stretch; } .fiche-donut { margin: 0 auto; } .report-tools { flex-wrap: wrap; } }
+@media print { .fiche-svg, .fiche-stack, .fiche-legend, .fiche-dot, .fiche-donut { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }

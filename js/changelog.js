@@ -3,6 +3,14 @@
    La plus récente en premier. `id` sert à savoir ce qu'un agent a déjà vu. */
 export const CHANGELOG = [
   {
+    id: '22.13', date: '2026-11-15', title: 'Synthèse PDF de la redevance spéciale',
+    summary: 'Un bouton produit la synthèse de l’exercice, avec ses graphiques, à vérifier à l’écran avant de l’enregistrer en PDF.',
+    items: [
+      {tag: 'Nouveau', text: 'Redevance spéciale › Synthèse PDF : chiffres clés et taux de recouvrement, facturé et encaissé par exercice, situation des dossiers, plus gros restes à recouvrer, ancienneté des créances, et le détail entreprise par entreprise.', href: '#/fiche/rs'},
+      {tag: 'Nouveau', text: 'La synthèse s’affiche d’abord à l’écran telle qu’elle sera imprimée ; on change d’exercice d’un clic, puis « Enregistrer en PDF ».', href: '#/fiche/rs'},
+    ],
+  },
+  {
     id: '22.12', date: '2026-11-15', title: 'Documents : toutes les pièces d’un état, liste par exercice',
     summary: 'Les EDET mensuels s’ouvrent tous depuis la grille, et la liste se lit année par année.',
     items: [

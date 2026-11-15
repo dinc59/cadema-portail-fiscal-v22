@@ -134,6 +134,7 @@ export function render({year, params, sub}) {
       <p class="ph-lede">${data.list.length} entreprises suivies, ${data.concerned} concernées en ${year}. Le badge de chaque ligne est la situation saisie dans Suivi_RS_Annuel ; les montants viennent de la même table.</p>
     </div>
     <div class="ph-actions">
+      <a class="btn" href="#/fiche/rs?an=${year}">${icon('chart', 16)}Synthèse PDF</a>
       <button class="btn" data-export>${icon('download', 16)}Exporter</button>
       <button class="btn btn-primary" data-new>${icon('plus', 16)}Nouvelle entreprise</button>
     </div>
