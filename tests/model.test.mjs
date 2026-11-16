@@ -34,11 +34,12 @@ db.tables = {
 };
 const by = Object.fromEntries(M.revenueByBudget(2025).map(b => [b.key, b]));
 // Principal : CFE 1000 + IFER 50 + DGF 1000 (somme, pas de ligne Total en 2025) ; COMP, TASCOM, FPIC inconnus
-assert.equal(by.Principal.total, 2050);
-assert.equal(by.Principal.covered, 3); assert.equal(by.Principal.expected, 6);
+// + GEMAPI : produit voté de référence (3 294 189 € en 2025, 1 350 550 € en 2024)
+assert.equal(by.Principal.total, 2050 + 3294189);
+assert.equal(by.Principal.covered, 4); assert.equal(by.Principal.expected, 7, 'les taxes additionnelles sans produit saisi sont masquées');
 // Comparable : CFE 1000/800 et DGF 1000/900 (Total 2024 fait foi) ; IFER exclu
-assert.equal(by.Principal.comparable, 2);
-assert.ok(Math.abs(by.Principal.delta - (2000/1700 - 1)) < 1e-9);
+assert.equal(by.Principal.comparable, 3);
+assert.ok(Math.abs(by.Principal.delta - ((2000 + 3294189) / (1700 + 1350550) - 1)) < 1e-9);
 // Déchets : TEOM 500 (prévision) + RS facturé 200 (la non concernée est exclue)
 assert.equal(by['Déchets'].total, 700);
 const rs = by['Déchets'].lines.find(l => l.code === 'RS');
@@ -137,3 +138,33 @@ const U = await import(`${repo}/js/ui.js`);
 const csv = U.csvText(['A'], [['=HYPERLINK("x")'], ['+33 6'], ['@SUM(1)'], ['-1200'], ['-2,5'], ['-cmd'], ['Texte; avec "guillemets"'], [1250.5], [null]]).slice(1).split('\r\n');
 assert.deepEqual(csv, ['A', `"'=HYPERLINK(""x"")"`, "'+33 6", "'@SUM(1)", '-1200', '-2,5', "'-cmd", '"Texte; avec ""guillemets"""', '1250.5', '']);
 console.log('export CSV : tous les contrôles passent');
+
+
+// ── Propositions 2027 et GEMAPI ──
+db.tables.Taxes = []; db.tables.Parametres = [];
+assert.equal(M.rateFor('TEOM', 2026).rate, 14.4);
+const t27 = M.rateFor('TEOM', 2027); assert.equal(t27.rate, 17.4); assert.equal(t27.proposed, true);
+assert.equal(M.rateHorizon(2026), 2027);
+let hp = M.rateHistory('TFPB', 2027);
+assert.deepEqual(hp.map(p => [p.from, p.to, p.rate, p.absent, p.proposed]), [[2016, 2026, null, true, false], [2027, 2027, 6.71, false, true]]);
+// Le taux voté saisi dans Grist confirme la proposition (ou la remplace)
+db.tables.Taxes = [{id: 1, Code: 'TEOM', Exercice: 2027, Taux: '17,40 %'}, {id: 2, Code: 'THRS', Exercice: 2027, Taux: 10}];
+assert.ok(!M.rateFor('TEOM', 2027).proposed, 'saisi dans Grist : plus « proposé »');
+assert.equal(M.rateFor('TEOM', 2027).origin, 'grist');
+assert.equal(M.rateHistory('THRS', 2027).at(-1).rate, 10, 'un vote différent de la proposition l’emporte');
+const sumGains = Object.values(M.PROPOSAL_GAINS).reduce((a, b) => a + b, 0);
+assert.equal(sumGains, 6994870, 'total des recettes nouvelles du document');
+// GEMAPI : référence, puis saisie Grist prioritaire ; 2027 non arrêté
+db.tables.Taxes = [];
+assert.equal(M.gemapiProduct(2024).amount, 1350550); assert.equal(M.gemapiProduct(2027), null);
+assert.deepEqual(M.gemapiHistory(2027).map(h => h.year), [2022, 2023, 2024, 2025, 2026]);
+db.tables.Taxes = [{id: 1, Code: 'GEMAPI', Exercice: 2027, Produit: 3500000, Statut: 'Définitif'}];
+assert.equal(M.gemapiProduct(2027).amount, 3500000); assert.equal(M.gemapiProduct(2027).origin, 'grist');
+assert.equal(M.GEMAPI.ceiling - M.GEMAPI.voted[2026], 727971);
+// Une taxe additionnelle apparaît dans le budget principal dès qu'un produit est saisi
+db.tables.Taxes = [{id: 1, Code: 'TFPB', Exercice: 2027, Produit: 3894417, Statut: 'Prévision'}];
+const p27 = M.revenueByBudget(2027).find(b => b.key === 'Principal');
+assert.ok(p27.lines.some(l => l.code === 'TFPB' && l.amount === 3894417));
+assert.ok(!p27.lines.some(l => l.code === 'TFPNB'));
+db.tables.Taxes = [];
+console.log('propositions 2027 et GEMAPI : tous les contrôles passent');

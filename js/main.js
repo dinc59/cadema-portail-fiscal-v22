@@ -141,7 +141,7 @@ function menuPanel(kind) {
       </div>
       <div class="mega-side">
         <a class="mega-link" href="#/recettes">${icon('chart')}<span><b>Vue d’ensemble</b><span>Toutes les recettes, tous les exercices</span></span></a>
-        <a class="mega-link" href="#/taux">${icon('target')}<span><b>Taux votés</b><span>CFE, TEOM, versement mobilité · historique et délibérations</span></span></a>
+        <a class="mega-link" href="#/taux">${icon('target')}<span><b>Taux votés et GEMAPI</b><span>Taux en vigueur, propositions 2027, produit GEMAPI</span></span></a>
         <a class="mega-link" href="#/recettes/CFE?tab=terrain">${icon('map')}<span><b>CFE · suivi terrain</b><span>Visites, locaux exploités et vacants</span></span></a>
         <a class="mega-link" href="#/recettes/VM?tab=employeurs">${icon('building')}<span><b>VM · employeurs</b><span>Anomalies de déclaration</span></span></a>
       </div>
@@ -271,7 +271,7 @@ function paletteItems() {
     {kind: 'Page', label: 'Point mensuel (PDF)', href: '#/rapport', ic: 'download'},
     {kind: 'Page', label: 'Dotations DGF & FPIC', href: '#/finances?tab=dotations', ic: 'landmark'},
     {kind: 'Page', label: 'Recettes par budget', href: '#/finances?tab=recettes', ic: 'chart'},
-    {kind: 'Page', label: 'Taux votés (CFE, TEOM, VM)', href: '#/taux', ic: 'target'},
+    {kind: 'Page', label: 'Taux votés, propositions 2027 et GEMAPI', href: '#/taux', ic: 'target'},
     {kind: 'Page', label: 'Synthèse PDF de la redevance spéciale', href: '#/fiche/rs', ic: 'download'},
     {kind: 'Page', label: 'États fiscaux (1259, 1386, EDET, EDAC)', href: '#/documents', ic: 'table'},
     {kind: 'Page', label: 'Équipe & paramètres', href: '#/equipe', ic: 'users'},

@@ -364,3 +364,30 @@ body.no-enter .siret-ok { animation: none; }
 .notice-critical { background: var(--critical-bg); }
 .notice-critical .ic, .notice-critical b { color: var(--critical); }
 .missing-banner { margin-bottom: 16px; }
+
+/* Taux : propositions 2027 et GEMAPI */
+.rate-next { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; padding: 6px 10px; border-radius: 8px; background: var(--warn-bg); color: var(--warn); font-size: 13px; }
+.rate-next b { font-variant-numeric: tabular-nums; }
+.rate-seg.is-proposed { background-image: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--seg) 35%, transparent) 6px 8px); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--seg) 60%, transparent); }
+.rate-grid + .card tbody tr[data-rate], .rate-grid + .card tbody tr[data-href] { cursor: pointer; }
+.notice-warn { background: var(--warn-bg); } .notice-warn .ic { color: var(--warn); }
+.gemapi-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.gemapi-kpis div { display: grid; gap: 2px; padding: 12px 14px; border-radius: var(--r-sm); background: var(--surface-2); }
+.gemapi-kpis span { font-size: 12px; color: var(--ink-3); } .gemapi-kpis em { font-style: normal; font-size: 12px; color: var(--ink-3); }
+.gemapi-kpis b { font-family: var(--serif); font-size: 24px; font-weight: 500; font-variant-numeric: tabular-nums lining-nums; }
+.gemapi-cap { height: 8px; margin-top: 12px; border-radius: 4px; background: var(--sunk); overflow: hidden; }
+.gemapi-cap span { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+.gemapi-bars { display: flex; align-items: flex-end; gap: 10px; height: 170px; }
+.gb { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 6px; }
+.gb span { width: 100%; max-width: 64px; border-radius: 6px 6px 2px 2px; background: color-mix(in srgb, var(--accent) 55%, var(--surface)); }
+.gb.on span { background: var(--accent); }
+.gb.is-next span { background: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--accent) 40%, transparent) 6px 8px); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent); }
+.gb em { font-style: normal; font-size: 12px; font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.gb b { font-size: 12.5px; font-weight: 500; color: var(--ink-3); } .gb.on b { color: var(--ink); font-weight: 700; }
+.gemapi-note { margin-top: 10px; font-size: 13px; }
+.rate-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.rate-steps li { display: grid; grid-template-columns: 190px 1fr; gap: 14px; padding: 12px 0; border-top: 1px solid var(--line); font-size: 13.5px; }
+.rate-steps li:first-child { border-top: 0; }
+.rate-steps b { font-variant-numeric: tabular-nums; } .rate-steps li.is-later { color: var(--ink-3); }
+@media (max-width: 640px) { .gemapi-kpis { grid-template-columns: 1fr; } .rate-steps li { grid-template-columns: 1fr; gap: 2px; } }
+@media print { .rate-seg.is-proposed, .gb span, .gemapi-cap span { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }

@@ -3,6 +3,15 @@
    La plus récente en premier. `id` sert à savoir ce qu'un agent a déjà vu. */
 export const CHANGELOG = [
   {
+    id: '22.15', date: '2026-11-16', title: 'Évolutions fiscales 2027 et GEMAPI',
+    summary: 'Les hausses et créations de taux proposées pour 2027, et le produit de la taxe GEMAPI.',
+    items: [
+      {tag: 'Nouveau', text: 'Taux : propositions soumises au conseil du 30 novembre 2026 — TEOM de 14,40 % à 17,40 %, création de taux additionnels de TFPB (6,71 %), TFPNB (3,11 %) et THRS (11,21 %), CFE inchangée. Recettes nouvelles estimées : 6 994 870 €. Les taux proposés restent signalés tant que le taux voté n’est pas saisi.', href: '#/taux'},
+      {tag: 'Nouveau', text: 'Taxe GEMAPI : produit voté depuis 2022 (3 294 189 € en 2025 et 2026), plafond légal et marge restante, hypothèse 2027, et un point d’attention sur la formulation du projet de Pacte.', href: '#/taux'},
+      {tag: 'Nouveau', text: 'Recettes par budget : la GEMAPI apparaît dans le budget principal ; les taxes additionnelles y apparaîtront dès qu’un produit sera saisi.', href: '#/finances?tab=recettes'},
+    ],
+  },
+  {
     id: '22.14', date: '2026-11-15', title: 'Fiabilisation des données',
     summary: 'Les chiffres financiers ne peuvent plus être faussés par un statut, un import ou une table manquante.',
     items: [

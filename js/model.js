@@ -394,6 +394,7 @@ export const BUDGETS = [
   {key: 'Mobilité', label: 'Budget annexe mobilité', slot: 4},
 ];
 const DEFAULT_BUDGET = {CFE: 'Principal', COMP: 'Principal', TASCOM: 'Principal', IFER: 'Principal', DGF: 'Principal', FPIC: 'Principal',
+  GEMAPI: 'Principal', TFPB: 'Principal', TFPNB: 'Principal', THRS: 'Principal',
   TEOM: 'Déchets', RS: 'Déchets', VM: 'Mobilité'};
 export function matchBudget(value) {
   const v = text(value).toLowerCase();
@@ -431,6 +432,16 @@ function revenueLine(code, year) {
       source: c?.source || text(p?.Source), prev: prev?.amount ?? null,
       forecast: p ? num(p.Prevision) : null, realised: p ? num(p.Realise) : null, href: `#/recettes/${code}`};
   }
+  if (code === 'GEMAPI') {
+    const g = gemapiProduct(year), q = gemapiProduct(year - 1);
+    return {code, label: 'Taxe GEMAPI (produit voté)', kind: 'gemapi', amount: g?.amount ?? null, status: g?.status || null,
+      source: g?.source || '', prev: q?.amount ?? null, href: '#/taux'};
+  }
+  if (RATE_INFO[code]?.additional) {
+    const c = taxCell(code, year), prev = taxCell(code, year - 1);
+    return {code, label: RATE_INFO[code].label, kind: 'fiscal', amount: c?.amount ?? null, status: c?.status || null,
+      source: c?.source || '', prev: prev?.amount ?? null, forecast: null, realised: null, href: '#/taux', optional: true};
+  }
   if (code === 'RS') {
     const r = rsYear(year), q = rsYear(year - 1);
     return {code, label: 'Redevance spéciale', kind: 'rs', amount: r.concerned ? r.billed : null, status: r.concerned ? 'Facturé' : null,
@@ -450,11 +461,13 @@ function revenueLine(code, year) {
   return null;
 }
 
-export const REVENUE_CODES = [...TAXES.map(t => t.code), 'RS', 'DGF', 'FPIC'];
+export const REVENUE_CODES = [...TAXES.map(t => t.code), 'TFPB', 'TFPNB', 'THRS', 'GEMAPI', 'RS', 'DGF', 'FPIC'];
 
 export function revenueByBudget(year) {
   return BUDGETS.map(b => {
-    const lines = REVENUE_CODES.filter(code => budgetOf(code) === b.key).map(code => revenueLine(code, year));
+    /* Les taxes additionnelles n'apparaissent que lorsqu'un produit est saisi. */
+    const lines = REVENUE_CODES.filter(code => budgetOf(code) === b.key).map(code => revenueLine(code, year))
+      .filter(l => !l.optional || l.amount !== null || l.prev !== null);
     const known = lines.filter(l => l.amount !== null);
     const total = known.reduce((s, l) => s + l.amount, 0);
     /* Évolution à périmètre comparable : seules les recettes connues
@@ -497,7 +510,10 @@ export const FIRST_FISCAL_YEAR = 2016;
    ne porte pas de taux. Un taux saisi dans Grist l'emporte toujours. */
 export const RATE_REFERENCE = {
   CFE: [{from: 2016, rate: 18.04, source: 'Taux voté à la création de la CADEMA, inchangé depuis'}],
-  TEOM: [{from: 2016, rate: 14.40, source: 'Taux voté à la création de la CADEMA, inchangé depuis'}],
+  TEOM: [
+    {from: 2016, rate: 14.40, source: 'Taux voté à la création de la CADEMA, inchangé depuis'},
+    {from: 2027, rate: 17.40, proposed: true, source: 'Proposition soumise au conseil communautaire du 30 novembre 2026 (+3 points)'},
+  ],
   /* « toConfirm » : taux relevés sur une copie de la table Urssaf, pas sur la délibération. */
   VM: [
     {from: 2016, rate: null, absent: true, source: 'Versement mobilité pas encore institué'},
@@ -506,12 +522,27 @@ export const RATE_REFERENCE = {
     {from: 2022, rate: 0.90, effect: '1er janvier 2022', source: 'Table des taux Urssaf ; taux relevé de 0,90 % à 1,50 % en 2025'},
     {from: 2025, rate: 1.50, effect: '1er janvier 2025', source: 'Délibération du 19 septembre 2024 (Urssaf, lettre circulaire 2024-0000009)'},
   ],
+  /* Taxes additionnelles : jamais instituées jusqu'en 2026, proposées pour 2027. */
+  TFPB: [{from: 2016, rate: null, absent: true, source: 'Non instituée'}, {from: 2027, rate: 6.71, proposed: true, source: 'Proposition soumise au conseil communautaire du 30 novembre 2026'}],
+  TFPNB: [{from: 2016, rate: null, absent: true, source: 'Non instituée'}, {from: 2027, rate: 3.11, proposed: true, source: 'Proposition soumise au conseil communautaire du 30 novembre 2026'}],
+  THRS: [{from: 2016, rate: null, absent: true, source: 'Non instituée'}, {from: 2027, rate: 11.21, proposed: true, source: 'Proposition soumise au conseil communautaire du 30 novembre 2026'}],
 };
+/* Un taux proposé reste marqué « proposé » tant que le taux voté n'est pas
+   saisi dans la table Taxes pour l'exercice : la saisie le confirme. */
+export const PROPOSAL = {vote: '30 novembre 2026', year: 2027, source: 'Rapports de présentation TEOM 2027 et taxes additionnelles 2027 ; simulations DGFiP'};
 export const RATE_INFO = {
   CFE: {label: 'Cotisation foncière des entreprises', base: 'Valeur locative des biens professionnels', payer: 'Entreprises du territoire'},
   TEOM: {label: 'Taxe d’enlèvement des ordures ménagères', base: 'Base du foncier bâti', payer: 'Propriétaires de locaux, refacturée aux occupants'},
   VM: {label: 'Versement mobilité', base: 'Masse salariale', payer: 'Employeurs de 11 salariés et plus'},
+  TFPB: {label: 'Taxe foncière sur les propriétés bâties', base: 'Valeur locative cadastrale des propriétés bâties', payer: 'Propriétaires', additional: true},
+  TFPNB: {label: 'Taxe foncière sur les propriétés non bâties', base: 'Valeur locative cadastrale des terrains', payer: 'Propriétaires', additional: true},
+  THRS: {label: 'Taxe d’habitation sur les résidences secondaires', base: 'Valeur locative des résidences secondaires', payer: 'Occupants de résidences secondaires', additional: true},
 };
+/* Taux plafond connus, pour mesurer la marge restante. */
+export const RATE_CEILING = {CFE: {rate: 18.94, gain: 113000, note: 'le taux plafond ne rapporterait qu’environ 113 000 €'}};
+/* Recettes nouvelles estimées si les propositions sont votées (base constante, bases prévisionnelles 2026). */
+export const PROPOSAL_GAINS = {TEOM: 1792483, TFPB: 3894417, TFPNB: 453656, THRS: 854314, GEMAPI: 0, CFE: 0};
+export const PROPOSAL_ESTIMATES = {TEOM: 10.40e6, TFPB: 3.89e6, TFPNB: 0.45e6, THRS: 0.85e6};
 export const RATE_CODES = Object.keys(RATE_REFERENCE);
 
 /* La colonne Taux est libre dans Grist : « 18,04 % », 18.04 ou 0,1804.
@@ -530,7 +561,7 @@ export function rateFor(code, year) {
     .map(r => parseRate(code, r.Taux)).find(v => v !== null);
   if (saisi !== undefined && saisi !== null) return {rate: saisi, origin: 'grist', source: 'Table Taxes du document Grist'};
   const ref = (RATE_REFERENCE[code] || []).filter(p => p.from <= year).sort((a, b) => b.from - a.from)[0];
-  return ref ? {rate: ref.rate, origin: 'reference', source: ref.source, absent: !!ref.absent, toConfirm: !!ref.toConfirm, effect: ref.from === year ? ref.effect : ''} : null;
+  return ref ? {rate: ref.rate, origin: 'reference', source: ref.source, absent: !!ref.absent, toConfirm: !!ref.toConfirm, proposed: !!ref.proposed, effect: ref.from === year ? ref.effect : ''} : null;
 }
 
 /* Périodes successives à taux constant, de la création à l'exercice demandé.
@@ -542,8 +573,9 @@ export function rateHistory(code, toYear) {
     const last = out[out.length - 1];
     const rate = r ? r.rate : null;
     const absent = !!r?.absent;
-    if (last && last.rate === rate && last.absent === absent) { last.to = y; if (r?.origin === 'grist') last.fromGrist = true; continue; }
-    out.push({from: y, to: y, rate, absent, toConfirm: !!r?.toConfirm, effect: r?.effect || '', source: r?.source || '', fromGrist: r?.origin === 'grist'});
+    const proposed = !!r?.proposed;
+    if (last && last.rate === rate && last.absent === absent && last.proposed === proposed) { last.to = y; if (r?.origin === 'grist') last.fromGrist = true; continue; }
+    out.push({from: y, to: y, rate, absent, proposed, toConfirm: !!r?.toConfirm, effect: r?.effect || '', source: r?.source || '', fromGrist: r?.origin === 'grist'});
   }
   return out;
 }
@@ -608,3 +640,30 @@ export function rsPayments(year) {
 /* Un dossier ne passe en « Soldée » que si le règlement saisi couvre le
    facturé : le statut ne crée jamais d'encaissement. */
 export const canSettle = x => num(x.billed) > 0 && (num(x.paid) || 0) >= num(x.billed);
+
+/* Dernier exercice couvert par une proposition de taux (pour prolonger la frise). */
+export const rateHorizon = year => Math.max(year, ...Object.values(RATE_REFERENCE).flat().filter(p => p.proposed).map(p => p.from));
+
+/* ── GEMAPI ────────────────────────────────────────────────────────── */
+/* La GEMAPI n'a pas de taux : le conseil arrête chaque année un produit,
+   avant le 15 avril (art. 1530 bis et 1639 A du CGI), plafonné à 40 € par
+   habitant. Produits votés de référence ; un produit saisi dans la table
+   Taxes (Code « GEMAPI ») l'emporte toujours. */
+export const GEMAPI = {
+  voted: {2022: 890853, 2023: 1069080, 2024: 1350550, 2025: 3294189, 2026: 3294189},
+  perHabitant: 32.76, ceilingPerHabitant: 40, ceiling: 4022160,
+  hypothesis: {year: 2027, amount: 3294189, label: 'Reconduction du produit actuel', note: 'Montant définitif arrêté après le point annuel avec le service GEMAPI, puis voté avant le 15 avril 2027.'},
+  source: 'Délibérations GEMAPI',
+};
+export function gemapiProduct(year) {
+  const c = rows('Taxes').filter(r => text(r.Code).toUpperCase() === 'GEMAPI' && num(r.Exercice) === year && num(r.Produit) !== null)
+    .sort((a, b) => statusRank(b.Statut) - statusRank(a.Statut))[0];
+  if (c) return {amount: num(c.Produit), status: text(c.Statut) || 'Voté', source: text(c.Source) || 'Table Taxes du document Grist', origin: 'grist'};
+  const v = GEMAPI.voted[year];
+  return v === undefined ? null : {amount: v, status: 'Voté', source: GEMAPI.source, origin: 'reference'};
+}
+export function gemapiHistory(toYear) {
+  const ys = [...new Set([...Object.keys(GEMAPI.voted).map(Number), ...rows('Taxes').filter(r => text(r.Code).toUpperCase() === 'GEMAPI').map(r => num(r.Exercice))])]
+    .filter(y => y && y <= toYear).sort((a, b) => a - b);
+  return ys.map(y => ({year: y, ...(gemapiProduct(y) || {amount: null})}));
+}
