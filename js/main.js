@@ -17,6 +17,7 @@ import * as rapport from './pages/rapport.js';
 import * as taux from './pages/taux.js';
 import * as fiche from './pages/fiche.js';
 import { unseen } from './changelog.js';
+import { installUpdateCheck } from './update.js';
 
 const store = {
   get: k => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -539,3 +540,4 @@ applyTheme();
 installTooltips();
 render();
 connect().catch(err => { console.error(err); db.status = 'denied'; db.error = err.message; render(); });
+installUpdateCheck();

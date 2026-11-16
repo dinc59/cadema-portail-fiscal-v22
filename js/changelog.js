@@ -3,6 +3,13 @@
    La plus récente en premier. `id` sert à savoir ce qu'un agent a déjà vu. */
 export const CHANGELOG = [
   {
+    id: '22.16', date: '2026-11-16', title: 'Mise à jour automatique',
+    summary: 'Le portail se met à jour tout seul après chaque mise en ligne, sans vider le cache du navigateur.',
+    items: [
+      {tag: 'Amélioré', text: 'À l’ouverture et à chaque retour sur l’onglet, le portail vérifie s’il existe une version plus récente. Si oui, il rafraîchit ses fichiers et se recharge de lui-même : plus besoin de vider le cache ni de recharger plusieurs fois.'},
+    ],
+  },
+  {
     id: '22.15', date: '2026-11-16', title: 'Évolutions fiscales 2027 et GEMAPI',
     summary: 'Les hausses et créations de taux proposées pour 2027, et le produit de la taxe GEMAPI.',
     items: [
