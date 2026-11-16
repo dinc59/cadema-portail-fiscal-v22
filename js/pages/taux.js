@@ -72,10 +72,11 @@ function gemapiCard(current) {
   const hist = M.gemapiHistory(current);
   const cur = M.gemapiProduct(current);
   const prev24 = M.gemapiProduct(2024);
-  const max = Math.max(M.GEMAPI.ceiling, ...hist.map(h => h.amount || 0));
+  const cap = M.gemapiCeiling();
+  const max = Math.max(cap.ceiling, ...hist.map(h => h.amount || 0));
   const hy = M.GEMAPI.hypothesis;
   const voted = M.gemapiProduct(hy.year);
-  const used = cur ? cur.amount / M.GEMAPI.ceiling : 0;
+  const used = cur ? cur.amount / cap.ceiling : 0;
   const drop = cur && prev24 ? cur.amount - prev24.amount : null;
   return `<article class="card mt" id="gemapi">
     <div class="card-head"><div><p class="card-eyebrow">Taxe GEMAPI</p><h2>${cur ? `${esc(fmt.eur(cur.amount))} votés pour ${current}` : 'Produit non renseigné'}</h2>
@@ -83,11 +84,12 @@ function gemapiCard(current) {
       ${badge('Reconduit · aucune hausse programmée', 'neutral')}</div>
     <div class="card-body">
       <div class="gemapi-kpis">
-        <div><span>Par habitant</span><b>${esc(M.GEMAPI.perHabitant.toLocaleString('fr-FR', {minimumFractionDigits: 2}))} €</b><em>plafond légal ${M.GEMAPI.ceilingPerHabitant} €</em></div>
-        <div><span>Plafond légal</span><b>${esc(fmt.eur(M.GEMAPI.ceiling))}</b><em>${esc(fmt.pct(used))} utilisé</em></div>
-        <div><span>Marge restante</span><b>${esc(fmt.eur(cur ? M.GEMAPI.ceiling - cur.amount : null))}</b><em>sous le plafond</em></div>
+        <div><span>Par habitant</span><b>${cur ? esc((cur.amount / cap.population.value).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2})) : '—'} €</b><em>plafond légal ${M.GEMAPI.ceilingPerHabitant} €</em></div>
+        <div><span>Plafond légal</span><b>${esc(fmt.eur(cap.ceiling))}</b><em>${esc(fmt.pct(used))} utilisé</em></div>
+        <div><span>Marge restante</span><b>${esc(fmt.eur(cur ? cap.ceiling - cur.amount : null))}</b><em>sous le plafond par habitant</em></div>
       </div>
-      <div class="gemapi-cap" aria-hidden="true"><span style="width:${(used * 100).toFixed(1)}%"></span></div>
+      <div class="gemapi-cap" aria-hidden="true"><span style="width:${(Math.min(1, used) * 100).toFixed(1)}%"></span></div>
+      <p class="muted gemapi-note">Calculé sur ${esc(fmt.int(cap.population.value))} habitants, ${esc(cap.population.label)}${cap.population.detail ? ` (${esc(cap.population.detail)})` : ''}.${cap.population.fromGrist ? '' : ` Avant le recensement, ${esc(fmt.int(cap.population.previous))} habitants donnaient un plafond de ${esc(fmt.eur(cap.previousCeiling))}. Le plafond légal se calcule sur la population DGF (art. L. 2334-2 CGCT), un peu supérieure : saisissez-la dans Parametres (clé POPULATION_DGF) dès sa notification.`} Le produit reste aussi plafonné par le coût prévisionnel de la compétence GEMAPI.</p>
       <p class="menu-label" style="padding:18px 0 8px">Produit voté par exercice</p>
       <div class="gemapi-bars">${hist.map(h => `<div class="gb${h.year === current ? ' on' : ''}"><em>${esc(fmt.short(h.amount))}</em><span style="height:${h.amount ? (h.amount / max * 100).toFixed(1) : 0}%"></span><b>${h.year}</b></div>`).join('')}
         <div class="gb is-next"><em>${voted ? esc(fmt.short(voted.amount)) : 'à arrêter'}</em><span style="height:${((voted?.amount ?? hy.amount) / max * 100).toFixed(1)}%"></span><b>${hy.year}</b></div></div>

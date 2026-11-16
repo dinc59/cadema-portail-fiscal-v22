@@ -651,10 +651,26 @@ export const rateHorizon = year => Math.max(year, ...Object.values(RATE_REFERENC
    Taxes (Code « GEMAPI ») l'emporte toujours. */
 export const GEMAPI = {
   voted: {2022: 890853, 2023: 1069080, 2024: 1350550, 2025: 3294189, 2026: 3294189},
-  perHabitant: 32.76, ceilingPerHabitant: 40, ceiling: 4022160,
+  ceilingPerHabitant: 40,
+  /* Population : recensement exhaustif INSEE de Mayotte (nov. 2025 – janv. 2026),
+     population municipale au 1er janvier 2026. Résultats authentifiés par décret
+     fin 2026. Le plafond légal se calcule sur la population DGF (art. L. 2334-2
+     CGCT), un peu supérieure : la saisir dans Parametres (POPULATION_DGF) dès
+     qu'elle est notifiée, elle remplace alors ce chiffre. */
+  population: {value: 114990, detail: 'Mamoudzou 94 603, Dembéni 20 387', label: 'population municipale INSEE au 1er janvier 2026', previous: 100554},
+  /* Les deux plafonds légaux : 40 € par habitant, et le coût prévisionnel de la compétence. */
   hypothesis: {year: 2027, amount: 3294189, label: 'Reconduction du produit actuel', note: 'Montant définitif arrêté après le point annuel avec le service GEMAPI, puis voté avant le 15 avril 2027.'},
   source: 'Délibérations GEMAPI',
 };
+export function gemapiPopulation() {
+  const dgf = num(param('POPULATION_DGF'));
+  return dgf ? {value: dgf, label: 'population DGF notifiée', detail: '', fromGrist: true} : {...GEMAPI.population, fromGrist: false};
+}
+export function gemapiCeiling() {
+  const p = gemapiPopulation();
+  return {population: p, ceiling: p.value * GEMAPI.ceilingPerHabitant, previousCeiling: GEMAPI.population.previous * GEMAPI.ceilingPerHabitant};
+}
+
 export function gemapiProduct(year) {
   const c = rows('Taxes').filter(r => text(r.Code).toUpperCase() === 'GEMAPI' && num(r.Exercice) === year && num(r.Produit) !== null)
     .sort((a, b) => statusRank(b.Statut) - statusRank(a.Statut))[0];

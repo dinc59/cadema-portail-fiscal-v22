@@ -3,6 +3,13 @@
    La plus récente en premier. `id` sert à savoir ce qu'un agent a déjà vu. */
 export const CHANGELOG = [
   {
+    id: '22.17', date: '2026-11-16', title: 'GEMAPI : nouvelle population INSEE',
+    summary: 'Le plafond de la taxe GEMAPI tient compte du recensement de Mayotte.',
+    items: [
+      {tag: 'Corrigé', text: 'Taxe GEMAPI : plafond calculé sur 114 990 habitants (recensement INSEE au 1er janvier 2026 : Mamoudzou 94 603, Dembéni 20 387), soit 4 599 600 € au lieu de 4 022 160 €. Marge restante : 1 305 411 €. La population DGF notifiée, saisie dans Parametres (POPULATION_DGF), remplace ce chiffre.', href: '#/taux'},
+    ],
+  },
+  {
     id: '22.16', date: '2026-11-16', title: 'Mise à jour automatique',
     summary: 'Le portail se met à jour tout seul après chaque mise en ligne, sans vider le cache du navigateur.',
     items: [
