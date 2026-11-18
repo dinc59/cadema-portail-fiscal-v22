@@ -391,3 +391,7 @@ body.no-enter .siret-ok { animation: none; }
 .rate-steps b { font-variant-numeric: tabular-nums; } .rate-steps li.is-later { color: var(--ink-3); }
 @media (max-width: 640px) { .gemapi-kpis { grid-template-columns: 1fr; } .rate-steps li { grid-template-columns: 1fr; gap: 2px; } }
 @media print { .rate-seg.is-proposed, .gb span, .gemapi-cap span { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+
+/* Pièce jointe déposée : ouvrir, remplacer, retirer */
+.att-actions { display: inline-flex; align-items: center; gap: 2px; }
+.att-actions .icon-btn { width: 30px; height: 30px; }

@@ -3,6 +3,13 @@
    La plus récente en premier. `id` sert à savoir ce qu'un agent a déjà vu. */
 export const CHANGELOG = [
   {
+    id: '22.18', date: '2026-11-18', title: 'Redevance : remplacer ou retirer une pièce',
+    summary: 'Un avis de somme à payer ou une convention déposés par erreur se corrigent depuis la fiche entreprise.',
+    items: [
+      {tag: 'Corrigé', text: 'Fiche entreprise › Tous les exercices : à côté de « Ouvrir », un avis de somme à payer peut être remplacé ou retiré (avec Annuler). La convention peut aussi être retirée.', href: '#/redevance'},
+    ],
+  },
+  {
     id: '22.16', date: '2026-11-16', title: 'Mise à jour automatique',
     summary: 'Le portail se met à jour tout seul après chaque mise en ligne, sans vider le cache du navigateur.',
     items: [

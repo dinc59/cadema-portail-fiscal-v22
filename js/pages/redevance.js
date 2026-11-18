@@ -215,7 +215,7 @@ function fiche(id, year) {
         const y = M.num(a.Exercice);
         return `<tr${y === year ? ' class="is-current"' : ''}><td class="strong">${y}</td><td>${badge(M.text(a.Situation) || '—', tone(M.text(a.Situation)))}</td>
           <td class="num">${esc(fmt.eurc(M.num(a.Montant_Facture)))}</td><td class="num">${esc(fmt.eurc(M.num(a.Montant_Regle)))}</td>
-          <td>${av.length ? `<button class="btn btn-sm btn-ghost" data-att="${av[0]}">${icon('file', 14)}Ouvrir</button>` : `<button class="btn btn-sm btn-ghost" data-up="avis" data-up-row="${a.id}">${icon('upload', 14)}Déposer</button>`}</td></tr>`;
+          <td>${av.length ? `<span class="att-actions"><button class="btn btn-sm btn-ghost" data-att="${av[0]}">${icon('file', 14)}Ouvrir</button><button class="icon-btn" data-up="avis" data-up-row="${a.id}" aria-label="Remplacer l’avis ${y}" data-tip="Remplacer">${icon('upload', 15)}</button><button class="icon-btn" data-clear="avis" data-clear-row="${a.id}" data-clear-year="${y}" aria-label="Retirer l’avis ${y}" data-tip="Retirer">${icon('trash', 15)}</button></span>` : `<button class="btn btn-sm btn-ghost" data-up="avis" data-up-row="${a.id}">${icon('upload', 14)}Déposer</button>`}</td></tr>`;
       }).join('')}</tbody></table></div>` : '<p class="muted">Aucun suivi annuel pour cette entreprise.</p>'}
 
     <p class="form-section">Convention</p>
@@ -224,6 +224,7 @@ function fiche(id, year) {
       <span class="row-main"><b>${conv.length ? 'Convention déposée' : 'Aucune convention'}</b><span>${conv.length ? 'Pièce jointe Grist (Entreprises_RS.Convention_Fichier)' : 'Déposez le PDF signé'}</span></span>
       ${conv.length ? `<button class="btn btn-sm" data-att="${conv[0]}">${icon('external', 14)}Ouvrir</button>` : ''}
       <button class="btn btn-sm" data-up="convention">${icon('upload', 14)}${conv.length ? 'Remplacer' : 'Déposer'}</button>
+      ${conv.length ? `<button class="btn btn-sm btn-ghost" data-clear="convention">${icon('trash', 14)}Retirer</button>` : ''}
     </div>
 
     <p class="form-section">Entreprise</p>
@@ -298,7 +299,27 @@ function bindFiche(el, id, year) {
     const att = e.target.closest('[data-att]');
     if (att) { openAttachment(Number(att.dataset.att)).catch(err => toast(err.message, 'error')); return; }
     const up = e.target.closest('[data-up]');
-    if (up) { upKind = up.dataset.up; upRow = Number(up.dataset.upRow) || null; el.querySelector('[data-file]').click(); }
+    if (up) { upKind = up.dataset.up; upRow = Number(up.dataset.upRow) || null; el.querySelector('[data-file]').click(); return; }
+    /* Retirer une pièce : seule la ligne Grist est modifiée (champ vidé),
+       avec Annuler juste après. */
+    const clr = e.target.closest('[data-clear]');
+    if (!clr) return;
+    const x = M.rsYear(year).list.find(c => c.id === id);
+    const isConv = clr.dataset.clear === 'convention';
+    const rowId = isConv ? x.rowId : Number(clr.dataset.clearRow);
+    const table = isConv ? 'Entreprises_RS' : 'Suivi_RS_Annuel';
+    const col = isConv ? 'Convention_Fichier' : 'Avis_Fichier';
+    const current = rows(table).find(r => r.id === rowId)?.[col];
+    const label = isConv ? 'la convention' : `l’avis de somme à payer ${clr.dataset.clearYear || ''}`.trim();
+    const ok = await confirmDialog({title: `Retirer ${label} ?`, message: `Le fichier ne sera plus rattaché à ${x.name}. Vous pourrez annuler juste après, ou déposer le bon document.`, confirm: 'Retirer', danger: true});
+    if (!ok) return;
+    try {
+      await act([['UpdateRecord', table, rowId, {[col]: null}]]);
+      openFiche(id, year);
+      toast(`${label.charAt(0).toUpperCase() + label.slice(1)} retiré${isConv ? 'e' : ''}`, 'ok', {action: 'Annuler', timeout: 9000, onAction: async () => {
+        try { await act([['UpdateRecord', table, rowId, {[col]: current ?? null}]]); openFiche(id, year); toast('Pièce rétablie', 'info'); } catch (err) { toast(err.message, 'error'); }
+      }});
+    } catch (err) { toast(err.message, 'error'); }
   });
   el.addEventListener('change', async e => {
     if (!e.target.matches('[data-file]')) return;
