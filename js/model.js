@@ -220,6 +220,25 @@ export function recovery() {
   return {list, byYear, counts, amounts, confirmed, unsure: amounts['À qualifier'] || 0, rest: list.reduce((s, c) => s + c.rest, 0), due: list.filter(c => c.due).length};
 }
 
+/* ── Relances ─────────────────────────────────────────────────────── */
+/* La relance porte sur les exercices titrés (exigibles) ; à défaut, sur tous. */
+export const relanceYears = c => { const t = c.years.filter(y => /titre [ée]mis|partiel/i.test(y.situation)); return t.length ? t : c.years; };
+/* Après deux relances, la suivante est le dernier rappel (étape « Mise en demeure »). */
+export const nextRelance = c => c.relances >= 2 ? 'Mise en demeure' : `Relance ${c.relances + 1}`;
+export const RELANCE_DELAY = 15;
+/* Champs Entreprises_RS à écrire quand une relance part. */
+export function relanceFields(c, who, today = new Date()) {
+  const step = nextRelance(c);
+  const ys = relanceYears(c);
+  const line = `${today.toLocaleDateString('fr-FR')} · ${step} envoyée par ${who} · ${ys.reduce((s, y) => s + y.rest, 0).toLocaleString('fr-FR', {style: 'currency', currency: 'EUR'})} relancés (${ys.map(y => y.year).join(', ')})`;
+  const next = new Date(today.getFullYear(), today.getMonth(), today.getDate() + RELANCE_DELAY);
+  return {step, next, fields: {
+    Etape_Actuelle: step, Prochaine_Action: step === 'Mise en demeure' ? 'Transmettre au comptable public si toujours impayé' : 'Vérifier le paiement',
+    Date_Prochaine_Action: toGristDate(next), Notes: c.notes ? `${line}\n${c.notes}` : line,
+    Pilote_Dossier: c.pilot || who, Derniere_MAJ: nowSeconds(),
+  }};
+}
+
 /* ── Pilotage ──────────────────────────────────────────────────────── */
 export const TASK_STATUSES = ['À traiter', 'En cours', 'En attente', 'Terminé'];
 export const PLAN_STATUSES = ['À lancer', 'En cours', 'À sécuriser', 'Réalisé', 'Abandonné'];
@@ -366,6 +385,11 @@ export function quality(year) {
     detail: over.slice(0, 6).map(r => `${names.get(text(r.Entreprise_ID)) || text(r.Entreprise_ID)} ${num(r.Exercice)} (+${Math.round(num(r.Montant_Regle) - num(r.Montant_Facture)).toLocaleString('fr-FR')} €)`).join(' · '),
     fix: 'Trop-perçu, avoir ou erreur de saisie : vérifier auprès du comptable public, puis corriger le montant ou le noter dans les observations.',
     route: '#/redevance', ratio: rows('Suivi_RS_Annuel').length ? over.length / rows('Suivi_RS_Annuel').length : 0});
+  const unsure = rateChecks();
+  add({id: 'rates-unsure', level: 'warn', title: 'Taux et plafonds à confirmer',
+    ok: !unsure.length, count: unsure.length, detail: unsure.map(c => c.title).join(' · '),
+    fix: 'Chaque point se confirme sur la délibération ou l’état 1259, puis se saisit dans Grist : il disparaît alors de la liste.',
+    route: '#/taux', ratio: Math.min(1, unsure.length / 6)});
   /* Une table non lue fait passer des montants pour absents. */
   const missingTables = db.missing || [];
   add({id: 'tables', level: 'critical', title: 'Tables Grist non chargées',
@@ -529,7 +553,7 @@ export const RATE_REFERENCE = {
 };
 /* Un taux proposé reste marqué « proposé » tant que le taux voté n'est pas
    saisi dans la table Taxes pour l'exercice : la saisie le confirme. */
-export const PROPOSAL = {vote: '30 novembre 2026', year: 2027, source: 'Rapports de présentation TEOM 2027 et taxes additionnelles 2027 ; simulations DGFiP'};
+export const PROPOSAL = {vote: '30 novembre 2026', voteDate: new Date(2026, 11, 1), year: 2027, source: 'Rapports de présentation TEOM 2027 et taxes additionnelles 2027 ; simulations DGFiP'};
 export const RATE_INFO = {
   CFE: {label: 'Cotisation foncière des entreprises', base: 'Valeur locative des biens professionnels', payer: 'Entreprises du territoire'},
   TEOM: {label: 'Taxe d’enlèvement des ordures ménagères', base: 'Base du foncier bâti', payer: 'Propriétaires de locaux, refacturée aux occupants'},
@@ -539,11 +563,130 @@ export const RATE_INFO = {
   THRS: {label: 'Taxe d’habitation sur les résidences secondaires', base: 'Valeur locative des résidences secondaires', payer: 'Occupants de résidences secondaires', additional: true},
 };
 /* Taux plafond connus, pour mesurer la marge restante. */
-export const RATE_CEILING = {CFE: {rate: 18.94, gain: 113000, note: 'le taux plafond ne rapporterait qu’environ 113 000 €'}};
+export const RATE_CEILING = {CFE: {rate: 18.94, gain: 113000, note: 'le taux plafond ne rapporterait qu’environ 113 000 €',
+  /* Deux chiffres circulent : 18,62 % (~130 k€) et 18,94 % (~113 k€, projet de Pacte). Ce sont
+     probablement deux millésimes de l'état 1259 (la base CFE a baissé de ~44 % entre 2025 et 2026) :
+     à vérifier sur la ligne « taux plafond » de l'état 1259 de l'exercice. */
+  toConfirm: true, alt: 'Un autre document donne 18,62 % (~130 000 €) : sans doute un autre millésime de l’état 1259.'}};
 /* Recettes nouvelles estimées si les propositions sont votées (base constante, bases prévisionnelles 2026). */
 export const PROPOSAL_GAINS = {TEOM: 1792483, TFPB: 3894417, TFPNB: 453656, THRS: 854314, GEMAPI: 0, CFE: 0};
 export const PROPOSAL_ESTIMATES = {TEOM: 10.40e6, TFPB: 3.89e6, TFPNB: 0.45e6, THRS: 0.85e6};
 export const RATE_CODES = Object.keys(RATE_REFERENCE);
+
+/* ── Référentiel modifiable dans Grist ─────────────────────────────── */
+/* Les valeurs ci-dessus sont la référence de départ. Dès que la table
+   Referentiel_Taux porte des lignes pour une taxe, ce sont elles qui font
+   foi pour cette taxe : l'équipe corrige un taux sans toucher au code.
+   Les montants (gains attendus, plafonds) se corrigent dans Parametres. */
+export const REF_TABLE = 'Referentiel_Taux';
+export const REF_STATUSES = ['Voté', 'Proposé', 'À confirmer', 'Non institué'];
+export const REF_COLUMNS = [
+  {id: 'Code', type: 'Text'}, {id: 'A_partir_de', type: 'Int'}, {id: 'Taux', type: 'Numeric'},
+  {id: 'Statut', type: 'Text'}, {id: 'Effet', type: 'Text'}, {id: 'Source', type: 'Text'},
+];
+export const refInGrist = () => db.tables[REF_TABLE] !== undefined;
+const refStatus = p => p.absent ? 'Non institué' : p.proposed ? 'Proposé' : p.toConfirm ? 'À confirmer' : 'Voté';
+export function refPeriods(code) {
+  const g = rows(REF_TABLE).filter(r => text(r.Code).toUpperCase() === code && num(r.A_partir_de));
+  if (!g.length) return RATE_REFERENCE[code] || [];
+  return g.map(r => {
+    const st = text(r.Statut);
+    const absent = /non\s*instit/i.test(st);
+    return {from: num(r.A_partir_de), rate: absent ? null : parseRate(code, r.Taux), absent, proposed: /propos/i.test(st),
+      toConfirm: /confirm/i.test(st), effect: text(r.Effet), source: text(r.Source) || 'Référentiel Grist', fromRef: true};
+  });
+}
+/* Lignes à écrire dans Referentiel_Taux pour l'initialiser avec la référence actuelle. */
+export function referenceSeed() {
+  return Object.entries(RATE_REFERENCE).flatMap(([code, list]) => list.map(p => ({
+    Code: code, A_partir_de: p.from, Taux: p.absent ? null : p.rate, Statut: refStatus(p), Effet: p.effect || '', Source: p.source || '',
+  })));
+}
+const paramNum = (key, fallback) => { const v = num(param(key)); return v === null ? fallback : v; };
+export const gainKey = code => `GAIN_${code}_${PROPOSAL.year}`;
+export const proposalGain = code => paramNum(gainKey(code), PROPOSAL_GAINS[code] || 0);
+export const proposalTotal = () => Object.keys(PROPOSAL_GAINS).reduce((s, c) => s + proposalGain(c), 0);
+export function rateCeiling(code) {
+  const ref = RATE_CEILING[code];
+  const rate = num(param(`PLAFOND_${code}`));
+  if (rate !== null) {
+    const gain = num(param(`PLAFOND_${code}_GAIN`));
+    return {rate, gain, note: gain ? `le taux plafond rapporterait environ ${Math.round(gain).toLocaleString('fr-FR')} €` : 'saisi dans Parametres', toConfirm: false, fromGrist: true};
+  }
+  return ref ? {...ref, fromGrist: false} : null;
+}
+/* Paramètres à créer dans Parametres (seulement ceux qui manquent). */
+export function paramSeed() {
+  const have = new Set(rows('Parametres').map(r => text(r.Cle)));
+  const out = Object.entries(PROPOSAL_GAINS).filter(([, v]) => v).map(([c, v]) => ({Cle: gainKey(c), Valeur: String(v), Description: `Recette nouvelle estimée ${PROPOSAL.year} si la proposition ${c} est votée (€)`}));
+  for (const [c, x] of Object.entries(RATE_CEILING)) {
+    out.push({Cle: `PLAFOND_${c}`, Valeur: String(x.rate), Description: `Taux plafond ${c} (%), relevé sur l’état 1259`});
+    out.push({Cle: `PLAFOND_${c}_GAIN`, Valeur: String(x.gain), Description: `Produit supplémentaire au taux plafond ${c} (€)`});
+  }
+  for (const [c, v] of Object.entries(SIM_BASES)) out.push({Cle: `BASE_${c}`, Valeur: String(v), Description: `Base prévisionnelle ${c} pour le simulateur (€)`});
+  return out.filter(r => !have.has(r.Cle));
+}
+
+/* ── Points à confirmer ────────────────────────────────────────────── */
+/* Ce qui ne doit pas être présenté comme sûr : la liste est calculée, elle
+   se vide d'elle-même quand la donnée est confirmée dans Grist. */
+const pctTxt = r => `${Number(r).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} %`;
+export function rateChecks(today = new Date()) {
+  const out = [];
+  for (const code of RATE_CODES) {
+    for (const p of refPeriods(code)) {
+      if (!p.toConfirm) continue;
+      const voted = rows('Taxes').some(r => text(r.Code).toUpperCase() === code && num(r.Exercice) === p.from && parseRate(code, r.Taux) !== null);
+      if (voted) continue;
+      out.push({code, title: `${code} : ${p.rate === null ? 'taux' : pctTxt(p.rate)} à partir de ${p.from}`, detail: p.source,
+        how: refInGrist() ? 'Vérifier sur la délibération, puis passer le statut à « Voté » dans Referentiel_Taux.' : 'Vérifier sur la délibération, puis saisir le taux de l’exercice dans Recettes (table Taxes).'});
+    }
+  }
+  for (const code of Object.keys(RATE_CEILING)) {
+    const c = rateCeiling(code);
+    if (c?.toConfirm) out.push({code, title: `Plafond ${code} : ${pctTxt(c.rate)}`, detail: c.alt,
+      how: `Relever la ligne « taux plafond » de l’état 1259 de l’exercice et la saisir dans Parametres (PLAFOND_${code}, PLAFOND_${code}_GAIN).`});
+  }
+  if (!gemapiPopulation().fromGrist) out.push({code: 'GEMAPI', title: 'Population DGF non saisie',
+    detail: `Le plafond GEMAPI est calculé sur la population municipale INSEE (${GEMAPI.population.value.toLocaleString('fr-FR')} habitants), pas sur la population DGF qui fait foi.`,
+    how: 'Saisir POPULATION_DGF dans Parametres dès la notification de la DGF.'});
+  if (today >= PROPOSAL.voteDate) {
+    const pending = RATE_CODES.filter(c => rateFor(c, PROPOSAL.year)?.proposed);
+    if (pending.length) out.push({code: 'Vote', title: `Vote du ${PROPOSAL.vote} passé : ${pending.join(', ')} encore « proposé »`,
+      detail: 'Les montants attendus restent des propositions tant que les taux votés ne sont pas saisis.',
+      how: `Saisir les taux votés ${PROPOSAL.year} dans Recettes (ou passer leur statut à « Voté » dans Referentiel_Taux).`});
+  }
+  return out;
+}
+
+/* ── Simulateur de taux ────────────────────────────────────────────── */
+/* Bases prévisionnelles déduites des simulations DGFiP du projet de Pacte
+   (recette nouvelle ÷ écart de taux) : ordres de grandeur, pas des bases
+   notifiées. Parametres (BASE_<CODE>) les remplace. */
+export const SIM_BASES = {
+  CFE: Math.round(113000 / 0.0090), TEOM: Math.round(1792483 / 0.03),
+  TFPB: Math.round(3894417 / 0.0671), TFPNB: Math.round(453656 / 0.0311), THRS: Math.round(854314 / 0.1121),
+};
+export const SIM_CODES = ['CFE', 'TEOM', 'TFPB', 'TFPNB', 'THRS'];
+export function simBase(code) {
+  const v = num(param(`BASE_${code}`));
+  return v !== null ? {value: v, fromGrist: true} : {value: SIM_BASES[code], fromGrist: false};
+}
+/* Produit d'un jeu de taux (en %) : par taxe, produit au taux actuel, au taux
+   simulé, écart, et dépassement éventuel du plafond connu. */
+export function simulate(rates, year) {
+  const lines = SIM_CODES.map(code => {
+    const base = simBase(code);
+    const now = rateFor(code, year);
+    const cur = now && !now.proposed && !now.absent ? now.rate || 0 : 0;
+    const sim = rates[code] ?? cur;
+    const ceiling = rateCeiling(code);
+    return {code, base: base.value, baseFromGrist: base.fromGrist, current: cur, rate: sim,
+      productNow: base.value * cur / 100, product: base.value * sim / 100, gain: base.value * (sim - cur) / 100,
+      overCeiling: !!(ceiling && sim > ceiling.rate + 1e-9), ceiling: ceiling?.rate ?? null};
+  });
+  return {lines, gain: lines.reduce((s, l) => s + l.gain, 0), product: lines.reduce((s, l) => s + l.product, 0)};
+}
 
 /* La colonne Taux est libre dans Grist : « 18,04 % », 18.04 ou 0,1804.
    Un nombre sans % sous le seuil de la taxe est lu comme une fraction. */
@@ -560,8 +703,8 @@ export function rateFor(code, year) {
   const saisi = rows('Taxes').filter(r => text(r.Code).toUpperCase() === code && num(r.Exercice) === year)
     .map(r => parseRate(code, r.Taux)).find(v => v !== null);
   if (saisi !== undefined && saisi !== null) return {rate: saisi, origin: 'grist', source: 'Table Taxes du document Grist'};
-  const ref = (RATE_REFERENCE[code] || []).filter(p => p.from <= year).sort((a, b) => b.from - a.from)[0];
-  return ref ? {rate: ref.rate, origin: 'reference', source: ref.source, absent: !!ref.absent, toConfirm: !!ref.toConfirm, proposed: !!ref.proposed, effect: ref.from === year ? ref.effect : ''} : null;
+  const ref = refPeriods(code).filter(p => p.from <= year).sort((a, b) => b.from - a.from)[0];
+  return ref ? {rate: ref.rate, origin: ref.fromRef ? 'referentiel' : 'reference', source: ref.source, absent: !!ref.absent, toConfirm: !!ref.toConfirm, proposed: !!ref.proposed, effect: ref.from === year ? ref.effect : ''} : null;
 }
 
 /* Périodes successives à taux constant, de la création à l'exercice demandé.
@@ -642,7 +785,7 @@ export function rsPayments(year) {
 export const canSettle = x => num(x.billed) > 0 && (num(x.paid) || 0) >= num(x.billed);
 
 /* Dernier exercice couvert par une proposition de taux (pour prolonger la frise). */
-export const rateHorizon = year => Math.max(year, ...Object.values(RATE_REFERENCE).flat().filter(p => p.proposed).map(p => p.from));
+export const rateHorizon = year => Math.max(year, ...RATE_CODES.flatMap(refPeriods).filter(p => p.proposed).map(p => p.from));
 
 /* ── GEMAPI ────────────────────────────────────────────────────────── */
 /* La GEMAPI n'a pas de taux : le conseil arrête chaque année un produit,

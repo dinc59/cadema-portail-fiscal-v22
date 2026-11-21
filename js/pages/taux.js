@@ -5,7 +5,7 @@
    dans la table Taxes pour l'exercice. */
 import * as M from '../model.js';
 import { act, fieldsFor, rows, uploadAttachment, openAttachment, attachmentIds } from '../grist.js';
-import { esc, attr, icon, fmt, badge, openDrawer, closeDrawer, toast } from '../ui.js';
+import { esc, attr, icon, fmt, badge, openDrawer, closeDrawer, toast, confirmDialog } from '../ui.js';
 import { author } from '../main.js';
 
 const pct = r => r === null || r === undefined ? '—' : `${r.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} %`;
@@ -19,14 +19,15 @@ function summary(code, current, horizon) {
   const hist = M.rateHistory(code, horizon);
   const cur = hist.find(p => p.from <= current && p.to >= current) || hist[hist.length - 1];
   const next = hist.find(p => p.from > current && p.proposed) || null;
-  const known = hist.filter(p => p.rate !== null && p.to <= current);
+  /* Périodes déjà en vigueur : une période qui déborde sur l'exercice proposé compte aussi. */
+  const known = hist.filter(p => p.rate !== null && !p.proposed && p.from <= current);
   const gap = hist.find(p => p.rate === null && !p.absent && p.from <= current);
   return {hist, cur, next, changes: known.length - 1, gap, instituted: known[0]?.from ?? null, since: cur.rate !== null ? cur.from : null};
 }
 
 function rateCard(code, current, horizon) {
   const r = summary(code, current, horizon);
-  const ceil = M.RATE_CEILING[code];
+  const ceil = M.rateCeiling(code);
   return `<article class="card rate-card" data-rate="${code}" role="button" tabindex="0" aria-label="Fiche du taux ${attr(code)}">
     <span class="rate-top"><span class="sw" style="background:${color(code)}"></span><b>${esc(code)}</b>
       ${r.next ? badge(`Hausse proposée ${r.next.from}`, 'warn') : r.cur.rate === null ? badge('À compléter', 'warn') : r.changes === 0 && !r.gap ? badge('Inchangé', 'good') : badge(`${r.changes + 1} taux successifs`, 'info')}</span>
@@ -34,21 +35,21 @@ function rateCard(code, current, horizon) {
     <span class="rate-label">${esc(M.RATE_INFO[code].label)}</span>
     <span class="rate-meta">${r.since ? `En vigueur depuis ${r.cur.effect ? esc(r.cur.effect) : r.since}` : 'Taux en vigueur non renseigné'}${r.changes > 0 && r.instituted ? ` · institué en ${r.instituted}` : ''}</span>
     ${r.next ? `<span class="rate-next">${icon('right', 14)}<b>${esc(pct(r.next.rate))}</b> proposé pour ${r.next.from} · vote du ${esc(M.PROPOSAL.vote)}</span>` : ''}
-    ${ceil ? `<span class="rate-meta">Plafond ${esc(pct(ceil.rate))} : ${esc(ceil.note)}</span>` : ''}
+    ${ceil ? `<span class="rate-meta">Plafond ${esc(pct(ceil.rate))} : ${esc(ceil.note)}${ceil.toConfirm ? ` ${badge('À confirmer', 'warn')}` : ''}</span>` : ''}
     <span class="rate-open">Historique et délibération ${icon('right', 14)}</span>
   </article>`;
 }
 
 function proposalCard(current) {
   const y = M.PROPOSAL.year;
-  const total = Object.values(M.PROPOSAL_GAINS).reduce((s, v) => s + v, 0);
+  const total = M.proposalTotal();
   const g = M.gemapiProduct(current);
   const row = code => {
     if (code === 'GEMAPI') return `<tr data-href="#gemapi"><td><span class="cell-name"><span class="sw" style="background:var(--accent)"></span><span><span class="strong">GEMAPI</span><span class="sub">Produit voté, pas de taux</span></span></span></td>
       <td class="num">${esc(fmt.eur(g?.amount ?? null))}</td><td class="num">Reconduction</td><td class="num muted">0 €</td><td>${badge('Hypothèse', 'neutral')}</td></tr>`;
     const now = M.rateFor(code, current), nxt = M.rateFor(code, y);
     const changed = nxt && nxt.rate !== (now?.rate ?? null);
-    const gain = M.PROPOSAL_GAINS[code] || 0;
+    const gain = M.proposalGain(code);
     return `<tr data-rate="${code}"><td><span class="cell-name"><span class="sw" style="background:${color(code)}"></span><span><span class="strong">${esc(code)}${M.RATE_INFO[code].additional ? ' additionnelle' : ''}</span><span class="sub">${esc(M.RATE_INFO[code].label)}</span></span></span></td>
       <td class="num">${now?.rate == null ? '0 %' : esc(pct(now.rate))}</td>
       <td class="num"><b>${esc(pct(nxt?.rate ?? now?.rate))}</b></td>
@@ -99,6 +100,95 @@ function gemapiCard(current) {
   </article>`;
 }
 
+
+/* ── Points à confirmer ───────────────────────────────────────────── */
+function checksCard() {
+  const list = M.rateChecks();
+  if (!list.length) return `<div class="notice notice-good mt">${icon('check', 16)}<span>Aucun taux ni plafond en attente de confirmation.</span></div>`;
+  return `<article class="card mt checks-card" id="a-confirmer">
+    <div class="card-head"><div><p class="card-eyebrow">Avant de diffuser</p><h2>${list.length} chiffre${list.length > 1 ? 's' : ''} à confirmer</h2>
+      <p class="card-sub">Ces valeurs ne reposent pas encore sur une pièce officielle. Ne les présentez pas comme sûres : chaque point disparaît dès qu’il est confirmé dans Grist.</p></div>
+      ${badge('À confirmer', 'warn')}</div>
+    <ul class="checks-list">${list.map(c => `<li><span class="checks-code">${esc(c.code)}</span><span class="row-main"><b>${esc(c.title)}</b><span>${esc(c.detail || '')}</span><span class="checks-how">${icon('right', 13)}${esc(c.how)}</span></span></li>`).join('')}</ul>
+  </article>`;
+}
+
+/* ── Simulateur ───────────────────────────────────────────────────── */
+const sim = {rates: null};
+function simDefaults(current) {
+  const y = M.PROPOSAL.year;
+  return Object.fromEntries(M.SIM_CODES.map(c => { const n = M.rateFor(c, y); return [c, n && !n.absent && n.rate !== null ? n.rate : 0]; }));
+}
+function simBody(current) {
+  const r = M.simulate(sim.rates, current);
+  const prop = M.simulate(simDefaults(current), current);
+  return `<div class="table-wrap"><table class="t sim-table">
+      <thead><tr><th>Taxe</th><th class="num">Base</th><th class="num">Taux ${current}</th><th class="num">Taux simulé</th><th class="num">Produit simulé</th><th class="num">Écart</th></tr></thead>
+      <tbody>${r.lines.map(l => `<tr${l.overCeiling ? ' class="is-over"' : ''}>
+        <td><span class="cell-name"><span class="sw" style="background:${color(l.code)}"></span><span><span class="strong">${esc(l.code)}</span><span class="sub">${esc(M.RATE_INFO[l.code].label)}</span></span></span></td>
+        <td class="num">${esc(fmt.short(l.base))}${l.baseFromGrist ? '' : '<sup>*</sup>'}</td>
+        <td class="num">${esc(pct(l.current))}</td>
+        <td class="num"><input class="input sim-input" type="number" inputmode="decimal" step="0.01" min="0" max="100" value="${attr(String(l.rate))}" data-sim="${l.code}" aria-label="Taux simulé ${attr(l.code)}"> %
+          ${l.overCeiling ? `<span class="sub late">au-dessus du plafond ${esc(pct(l.ceiling))}</span>` : ''}</td>
+        <td class="num">${esc(fmt.eur(l.product))}</td>
+        <td class="num">${l.gain ? `<span class="delta ${l.gain > 0 ? 'up' : 'down'}">${l.gain > 0 ? '+ ' : '− '}${esc(fmt.eur(Math.abs(l.gain)))}</span>` : '<span class="muted">0 €</span>'}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td>Total</td><td></td><td></td><td></td><td class="num">${esc(fmt.eur(r.product))}</td><td class="num"><b>${r.gain >= 0 ? '+ ' : '− '}${esc(fmt.eur(Math.abs(r.gain)))}</b></td></tr></tfoot>
+    </table></div>
+    <p class="sim-compare">${Math.abs(r.gain - prop.gain) < 1 ? 'Ce scénario correspond aux propositions soumises au vote.' : `Écart avec les propositions soumises au vote : <b>${r.gain - prop.gain >= 0 ? '+ ' : '− '}${esc(fmt.eur(Math.abs(r.gain - prop.gain)))}</b>.`}</p>`;
+}
+function simCard(current) {
+  if (!sim.rates) sim.rates = simDefaults(current);
+  const estimated = M.SIM_CODES.some(c => !M.simBase(c).fromGrist);
+  return `<article class="card mt" id="simulateur">
+    <div class="card-head"><div><p class="card-eyebrow">Simulateur</p><h2>Et si on votait d’autres taux ?</h2>
+      <p class="card-sub">Changez un taux : le produit et l’écart avec ${current} se recalculent. Le scénario de départ est celui soumis au vote du ${esc(M.PROPOSAL.vote)}.</p></div>
+      <button class="btn btn-sm" data-sim-reset>${icon('refresh', 14)}Revenir aux propositions</button></div>
+    <div data-sim-body>${simBody(current)}</div>
+    <div class="card-foot"><span class="muted">${estimated ? '* Base déduite des simulations DGFiP du projet de Pacte (recette ÷ écart de taux) : ordre de grandeur, pas une base notifiée. Saisissez la base de l’état 1259 dans Parametres (BASE_CFE, BASE_TEOM…) pour la remplacer. ' : ''}Calcul à base constante : n’intègre ni l’évolution des bases, ni les exonérations, ni les règles de lien entre taux (art. 1636 B sexies du CGI). Seuls les plafonds connus sont contrôlés.</span></div>
+  </article>`;
+}
+
+/* ── Référentiel ──────────────────────────────────────────────────── */
+function refCard() {
+  const inGrist = M.refInGrist();
+  const n = rows(M.REF_TABLE).length;
+  const missingParams = M.paramSeed();
+  if (inGrist && !missingParams.length) return `<div class="notice mt">${icon('check', 16)}<span>Taux de référence lus dans Grist (table <b>Referentiel_Taux</b>, ${n} ligne${n > 1 ? 's' : ''}). Gains attendus, plafonds et bases du simulateur se corrigent dans <b>Parametres</b>. Un taux saisi dans la table Taxes pour un exercice l’emporte toujours.</span></div>`;
+  return `<article class="card mt" id="referentiel">
+    <div class="card-head"><div><p class="card-eyebrow">Référentiel</p><h2>${inGrist ? 'Compléter les paramètres dans Grist' : 'Corriger les taux sans attendre une mise à jour'}</h2>
+      <p class="card-sub">${inGrist ? `La table Referentiel_Taux existe. Il manque ${missingParams.length} paramètre${missingParams.length > 1 ? 's' : ''} (gains attendus, plafonds, bases du simulateur) dans Parametres.`
+        : 'Aujourd’hui, les taux historiques, les plafonds et les gains attendus sont écrits dans le code du portail : les corriger demande une mise à jour. Un clic les copie dans Grist ; l’équipe les corrige ensuite directement dans le document, et le portail suit.'}</p></div></div>
+    <div class="card-body"><ul class="ref-what">
+      ${inGrist ? '' : `<li>Nouvelle table <b>Referentiel_Taux</b> : ${M.referenceSeed().length} lignes (Code, A_partir_de, Taux, Statut, Effet, Source). Statut : ${M.REF_STATUSES.map(esc).join(', ')}.</li>`}
+      ${missingParams.length ? `<li>${missingParams.length} ligne${missingParams.length > 1 ? 's' : ''} ajoutée${missingParams.length > 1 ? 's' : ''} dans <b>Parametres</b> : ${missingParams.map(p => esc(p.Cle)).join(', ')}.</li>` : ''}
+      <li>Rien n’est modifié ni supprimé dans les tables existantes.</li></ul></div>
+    <div class="card-foot"><span class="muted">Nécessite l’accès complet du widget.</span><button class="btn btn-primary" data-ref-create>${icon('table', 15)}${inGrist ? 'Ajouter les paramètres' : 'Copier le référentiel dans Grist'}</button></div>
+  </article>`;
+}
+
+async function createRef(btn) {
+  const inGrist = M.refInGrist();
+  const params = M.paramSeed();
+  const ok = await confirmDialog({title: inGrist ? 'Ajouter les paramètres ?' : 'Copier le référentiel dans Grist ?',
+    message: `${inGrist ? '' : `La table Referentiel_Taux sera créée avec ${M.referenceSeed().length} lignes. `}${params.length} paramètre(s) seront ajoutés dans Parametres. Aucune donnée existante n’est modifiée.`, confirm: inGrist ? 'Ajouter' : 'Copier dans Grist'});
+  if (!ok) return;
+  btn.disabled = true;
+  try {
+    const actions = [];
+    if (!inGrist) {
+      actions.push(['AddTable', M.REF_TABLE, M.REF_COLUMNS.map(c => ({id: c.id, type: c.type, isFormula: false}))]);
+      const seed = M.referenceSeed();
+      actions.push(['BulkAddRecord', M.REF_TABLE, seed.map(() => null), Object.fromEntries(M.REF_COLUMNS.map(c => [c.id, seed.map(r => r[c.id])]))]);
+    }
+    if (params.length) {
+      const cols = Object.keys(fieldsFor('Parametres', params[0]));
+      actions.push(['BulkAddRecord', 'Parametres', params.map(() => null), Object.fromEntries(cols.map(k => [k, params.map(p => p[k])]))]);
+    }
+    await act(actions, [M.REF_TABLE, 'Parametres']);
+    toast(inGrist ? 'Paramètres ajoutés dans Grist' : 'Référentiel copié dans Grist : les corrections se font désormais dans le document', 'ok', {timeout: 7000});
+  } catch (err) { toast(err.message, 'error'); btn.disabled = false; }
+}
+
 function calendarCard() {
   const steps = [
     ['30 novembre 2026', 'Conseil communautaire : vote du taux de TEOM et des taux additionnels (TFPB, TFPNB, THRS) applicables à compter de 2027.'],
@@ -125,7 +215,9 @@ export function render({year}) {
 
   <section class="grid g-3 rate-grid">${CURRENT.map(c => rateCard(c, current, horizon)).join('')}</section>
 
+  ${checksCard()}
   ${proposalCard(current)}
+  ${simCard(current)}
 
   <article class="card mt rate-timeline-card">
     <div class="card-head"><div><p class="card-eyebrow">Trajectoire</p><h2>${first} – ${horizon}</h2>
@@ -143,6 +235,7 @@ export function render({year}) {
   ${gemapiCard(current)}
   ${calendarCard()}
 
+  ${refCard()}
   <div class="notice mt">${icon('info', 16)}<span>Un taux voté se saisit dans <b>Recettes</b>, sur la fiche du produit (colonne Taux de l’exercice) : il l’emporte sur la valeur de référence et retire la mention « proposé ». Le produit GEMAPI se saisit de même avec le code <b>GEMAPI</b> dans la table Taxes.</span></div>`;
 }
 
@@ -158,7 +251,7 @@ function rateDrawer(code) {
         <div><dt>Redevables</dt><dd>${esc(info.payer)}</dd></div>
         <div><dt>En vigueur depuis</dt><dd>${cur.absent ? 'Non institué' : cur.rate === null ? 'Non renseigné' : cur.from}</dd></div>
       </dl>
-      ${next ? `<div class="notice notice-warn mt">${icon('alert', 16)}<span><b>${esc(pct(next.rate))} proposé pour ${next.from}</b>, soumis au conseil communautaire du ${esc(M.PROPOSAL.vote)}${M.PROPOSAL_GAINS[code] ? ` : recette nouvelle estimée à ${esc(fmt.eur(M.PROPOSAL_GAINS[code]))} à base constante` : ''}. Saisissez le taux voté dans Recettes pour le confirmer.</span></div>` : ''}
+      ${next ? `<div class="notice notice-warn mt">${icon('alert', 16)}<span><b>${esc(pct(next.rate))} proposé pour ${next.from}</b>, soumis au conseil communautaire du ${esc(M.PROPOSAL.vote)}${M.proposalGain(code) ? ` : recette nouvelle estimée à ${esc(fmt.eur(M.proposalGain(code)))} à base constante` : ''}. Saisissez le taux voté dans Recettes pour le confirmer.</span></div>` : ''}
       <p class="menu-label" style="padding:18px 0 8px">Historique</p>
       <div class="rate-periods">${[...hist].reverse().map(p => `<div class="rate-period${p.rate === null && !p.absent ? ' is-unknown' : ''}">
         <span class="rate-period-y">${esc(span(p))}</span><b>${p.absent ? 'Non institué' : p.rate === null ? 'Non renseigné' : esc(pct(p.rate))}</b>
@@ -167,7 +260,8 @@ function rateDrawer(code) {
       ${docs.length ? docs.map(d => {
         const ids = attachmentIds(d.file);
         return `<div class="doc"><span class="doc-ic">${icon('file', 18)}</span><span class="row-main"><b>${esc(d.title)}</b><span>${esc([d.year ? `exercice ${d.year}` : '', fmt.size(d.size)].filter(Boolean).join(' · '))}</span></span>
-          ${ids.length ? `<button class="btn btn-sm" data-att="${ids[0]}">${icon('download', 14)}PDF</button>` : d.link ? `<a class="btn btn-sm" href="${attr(d.link)}" target="_blank" rel="noopener noreferrer">${icon('external', 14)}Lien</a>` : ''}</div>`;
+          ${ids.length ? `<button class="btn btn-sm" data-att="${ids[0]}">${icon('download', 14)}PDF</button>` : d.link ? `<a class="btn btn-sm" href="${attr(d.link)}" target="_blank" rel="noopener noreferrer">${icon('external', 14)}Lien</a>` : ''}
+          <a class="icon-btn" href="#/documents?doc=${d.rowId}" aria-label="Modifier, remplacer ou supprimer ${attr(d.title)}" data-tip="Modifier ou remplacer">${icon('edit', 15)}</a></div>`;
       }).join('') : `<div class="notice">${icon('info', 16)}<span>Aucune délibération ${esc(code)} n’est encore déposée. Déposez le PDF : il sera rangé dans Documents et proposé ici à toute l’équipe.</span></div>`}
       <input type="file" accept="application/pdf,.pdf" hidden data-rate-file>`,
     footer: `<button class="btn btn-ghost" data-close>Fermer</button><button class="btn btn-primary" data-rate-upload>${icon('upload', 16)}${docs.length ? 'Ajouter une délibération' : 'Déposer la délibération (PDF)'}</button>`,
@@ -196,9 +290,31 @@ function rateDrawer(code) {
   });
 }
 
-export function mount(root) {
+export function mount(root, {year} = {}) {
+  const current = Math.max(year || 0, new Date().getFullYear());
   const open = el => rateDrawer(el.dataset.rate);
+  const simBox = root.querySelector('[data-sim-body]');
+  root.addEventListener('input', e => {
+    const inp = e.target.closest('[data-sim]');
+    if (!inp) return;
+    const v = Number(String(inp.value).replace(',', '.'));
+    if (!Number.isFinite(v) || v < 0 || v > 100) return;
+    sim.rates[inp.dataset.sim] = v;
+    /* Recalcule sans reconstruire les champs : le curseur reste en place. */
+    const tmp = document.createElement('div'); tmp.innerHTML = simBody(current);
+    simBox.querySelectorAll('tbody tr').forEach((tr, i) => {
+      const fresh = tmp.querySelectorAll('tbody tr')[i];
+      tr.className = fresh.className;
+      [4, 5].forEach(k => { tr.children[k].innerHTML = fresh.children[k].innerHTML; });
+      const sub = fresh.children[3].querySelector('.sub'); tr.children[3].querySelector('.sub')?.remove(); if (sub) tr.children[3].appendChild(sub);
+    });
+    simBox.querySelector('tfoot').innerHTML = tmp.querySelector('tfoot').innerHTML;
+    simBox.querySelector('.sim-compare').innerHTML = tmp.querySelector('.sim-compare').innerHTML;
+  });
   root.addEventListener('click', e => {
+    if (e.target.closest('[data-sim-reset]')) { sim.rates = simDefaults(current); simBox.innerHTML = simBody(current); return; }
+    const rc = e.target.closest('[data-ref-create]');
+    if (rc) { createRef(rc); return; }
     const card = e.target.closest('[data-rate]');
     if (card) { open(card); return; }
     const jump = e.target.closest('tr[data-href="#gemapi"]');

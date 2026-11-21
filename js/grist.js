@@ -9,6 +9,9 @@ export const TABLES = [
   'Etablissements_CFE', 'Calendrier_Fiscal', 'Budgets', 'CFU_Synthese',
   'Parametres', 'DGF_Detail', 'FPIC_Repartition', 'CFE_Synthese',
 ];
+/* Tables facultatives : créées depuis le portail quand l'équipe le décide.
+   Leur absence n'est pas une anomalie (pas de bandeau d'alerte). */
+export const OPTIONAL_TABLES = ['Referentiel_Taux'];
 
 export const db = {
   status: 'loading',      // loading | ready | denied | offline
@@ -50,7 +53,10 @@ function sig() {
 
 export async function loadAll({silent = false} = {}) {
   if (!window.grist?.docApi) { db.status = 'offline'; emit('status'); return; }
-  const results = await Promise.allSettled(TABLES.map(fetchOne));
+  const [results] = await Promise.all([
+    Promise.allSettled(TABLES.map(fetchOne)),
+    Promise.allSettled(OPTIONAL_TABLES.map(n => fetchOne(n).catch(() => { delete db.tables[n]; delete db.columns[n]; }))),
+  ]);
   db.missing = TABLES.filter((_, i) => results[i].status === 'rejected');
   if (db.missing.length === TABLES.length) {
     const reason = String(results[0].reason?.message || results[0].reason || '');

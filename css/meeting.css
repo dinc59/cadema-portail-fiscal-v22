@@ -205,3 +205,22 @@ body.is-report {
 .fiche-table tr.pay-partiel td:first-child { box-shadow: inset 3px 0 0 var(--s4); }
 .fiche-names { font-size: 12.5px; line-height: 1.7; color: #44515b; }
 @media print { .fiche-alert, .fiche-table tr { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+
+/* ── Courriers de relance (#/fiche/relances) ─────────────────────── */
+.letter { margin-bottom: 24px; font-size: 13.5px; line-height: 1.55; }
+.letter p { margin: 0 0 12px; }
+.letter-head { display: flex; gap: 14px; align-items: center; margin-bottom: 28px; }
+.letter-from { font-weight: 600; margin: 2px 0 0 !important; }
+.letter-to { margin: 0 0 22px 52%; display: flex; flex-direction: column; gap: 2px; }
+.letter-miss { color: #b0261b; font-weight: 600; }
+.letter-date { text-align: right; }
+.letter-ref { font-size: 12px; color: #66717a; }
+.letter-obj { margin: 16px 0 18px !important; }
+.letter-table { margin: 4px 0 16px; }
+.letter-sign { display: flex; flex-direction: column; margin: 22px 0 0 52%; }
+.letter-sign-space { height: 70px; }
+@media print {
+  .letter { break-after: page; margin: 0; }
+  .letter:last-of-type { break-after: auto; }
+  .letter-miss { color: transparent; }
+}

@@ -280,10 +280,14 @@ function editDrawer(rowId) {
         const file = e.target.files[0]; e.target.value = '';
         if (!file) return;
         toast(`Envoi de ${file.name}…`, 'info', {timeout: 2500});
+        /* Ce qu'il faut pour revenir à l'ancien fichier si le nouveau est le mauvais. */
+        const before = fieldsFor('Documents_Fiscaux', {Fichier: ids.length ? ['L', ...ids] : null, Taille_Octets: r.Taille_Octets ?? null, Date_Ajout: r.Date_Ajout ?? null, Ajoute_Par: r.Ajoute_Par ?? null});
         try {
           const attId = await uploadAttachment(file);
           await act([['UpdateRecord', 'Documents_Fiscaux', rowId, fieldsFor('Documents_Fiscaux', {Fichier: ['L', attId], Taille_Octets: file.size, Date_Ajout: M.nowSeconds(), Ajoute_Par: author()})]]);
-          toast(`${file.name} rattaché au document`);
+          toast(`${file.name} rattaché au document`, 'ok', ids.length ? {action: 'Annuler', timeout: 9000, onAction: async () => {
+            try { await act([['UpdateRecord', 'Documents_Fiscaux', rowId, before]]); toast('Ancien fichier rétabli', 'info'); } catch (err) { toast(err.message, 'error'); }
+          }} : undefined);
           editDrawer(rowId);
         } catch (err) { toast(err.message, 'error'); }
       });
@@ -291,7 +295,7 @@ function editDrawer(rowId) {
   });
 }
 
-export function mount(root) {
+export function mount(root, {params} = {}) {
   const box = root.querySelector('[data-docs]');
   const redraw = () => { const d = list(); box.innerHTML = items(d); root.querySelector('.result-count').textContent = `${d.length} document(s)`; };
   root.querySelector('.search-field input').addEventListener('input', e => { st.q = e.target.value; redraw(); });
@@ -316,4 +320,7 @@ export function mount(root) {
   root.addEventListener('dragover', e => { if (e.dataTransfer?.types.includes('Files')) { e.preventDefault(); root.classList.add('is-drop'); } });
   root.addEventListener('dragleave', e => { if (e.target === root) root.classList.remove('is-drop'); });
   root.addEventListener('drop', e => { e.preventDefault(); root.classList.remove('is-drop'); const file = e.dataTransfer.files[0]; if (file) uploadDrawer(file); });
+  /* Lien direct vers un document (ex. depuis la fiche d'un taux) : #/documents?doc=<ligne>. */
+  const want = Number(params?.get?.('doc'));
+  if (want && rows('Documents_Fiscaux').some(r => r.id === want)) { history.replaceState(null, '', '#/documents'); editDrawer(want); }
 }

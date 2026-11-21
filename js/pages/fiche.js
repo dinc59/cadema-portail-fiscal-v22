@@ -4,7 +4,8 @@
    Aucune bibliothèque, aucun envoi : tout reste sur le poste.
    Pour ajouter la synthèse d'une autre page : une entrée dans FICHES. */
 import * as M from '../model.js';
-import { esc, icon, fmt } from '../ui.js';
+import { act, fieldsFor } from '../grist.js';
+import { esc, icon, fmt, toast, confirmDialog } from '../ui.js';
 import { LOGO, author, CREDIT } from '../main.js';
 
 /* ── Graphiques SVG imprimables ───────────────────────────────────── */
@@ -129,13 +130,69 @@ function rs(year) {
   return {title: `Redevance spéciale — synthèse ${year}`, back: '#/redevance', sections, years};
 }
 
-const FICHES = {rs: {label: 'Redevance spéciale', build: rs}};
+/* ── Courriers de relance de la redevance spéciale ─────────────────── */
+/* Un courrier par page, prêt à signer. Le ton monte avec l'étape :
+   rappel, second rappel, puis dernier rappel avant transmission au
+   comptable public, seul compétent pour le recouvrement forcé d'un titre. */
+const LETTER = {
+  'Relance 1': {object: 'rappel de paiement', open: 'Sauf erreur ou omission de notre part, les sommes ci-dessous, dues au titre de la redevance spéciale pour l’enlèvement des déchets non ménagers, restent impayées à ce jour.',
+    ask: 'Nous vous invitons à les régler dans un délai de quinze jours à compter de la réception du présent courrier, auprès du comptable public, en rappelant la référence du titre de recettes.'},
+  'Relance 2': {object: 'second rappel', open: 'Malgré notre précédent courrier, les sommes ci-dessous, dues au titre de la redevance spéciale pour l’enlèvement des déchets non ménagers, restent impayées à ce jour.',
+    ask: 'Nous vous demandons de les régler sous quinze jours à compter de la réception du présent courrier, auprès du comptable public, en rappelant la référence du titre de recettes.'},
+  'Mise en demeure': {object: 'dernier rappel avant transmission au comptable public', open: 'Malgré nos précédents rappels, les sommes ci-dessous, dues au titre de la redevance spéciale pour l’enlèvement des déchets non ménagers, restent impayées à ce jour.',
+    ask: 'À défaut de règlement sous quinze jours à compter de la réception du présent courrier, le dossier sera transmis au comptable public, chargé du recouvrement forcé, qui pourra engager les poursuites prévues par la loi. Les frais qui en découlent resteraient à votre charge.'},
+};
+function letter(c, today) {
+  const step = M.nextRelance(c);
+  const w = LETTER[step] || LETTER['Relance 1'];
+  const ys = M.relanceYears(c);
+  const total = ys.reduce((s, y) => s + y.rest, 0);
+  return `<article class="report letter">
+    <header class="letter-head">${LOGO.replace('logo-mark', 'logo-mark report-logo')}
+      <div><p class="report-org">Communauté d’agglomération Dembéni-Mamoudzou</p><p class="letter-from">Pôle Fiscalité</p></div></header>
+    <div class="letter-to"><b>${esc(c.name)}</b>${c.contact ? `<span>À l’attention de ${esc(c.contact)}</span>` : ''}${c.address ? `<span>${esc(c.address)}</span>` : '<span class="letter-miss">Adresse à compléter</span>'}</div>
+    <p class="letter-date">Mamoudzou, le ${esc(today.toLocaleDateString('fr-FR', {day: 'numeric', month: 'long', year: 'numeric'}))}</p>
+    <p class="letter-ref">${c.siret ? `SIRET ${esc(c.siret)} · ` : ''}Dossier ${esc(c.id)}</p>
+    <p class="letter-obj"><b>Objet :</b> redevance spéciale — ${esc(w.object)}</p>
+    <p>Madame, Monsieur,</p>
+    <p>${esc(w.open)}</p>
+    <table class="fiche-table letter-table"><thead><tr><th>Exercice</th><th>Titre de recettes</th><th class="n">Montant dû</th><th class="n">Déjà réglé</th><th class="n">Reste à payer</th></tr></thead>
+      <tbody>${ys.map(y => `<tr><td>${y.year}</td><td>${y.title ? `n° ${esc(y.title)}${y.titleDate ? ` du ${esc(fmt.date(y.titleDate))}` : ''}` : 'non encore émis'}</td><td class="n">${esc(fmt.eurc(y.billed))}</td><td class="n">${esc(fmt.eurc(y.paid))}</td><td class="n"><b>${esc(fmt.eurc(y.rest))}</b></td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="4">Total restant dû</td><td class="n">${esc(fmt.eurc(total))}</td></tr></tfoot></table>
+    <p>${esc(w.ask)}</p>
+    <p>Si vous avez déjà réglé ces sommes, merci de ne pas tenir compte de ce courrier et de nous adresser une copie de votre justificatif. Pour toute contestation ou demande d’échéancier, le Pôle Fiscalité reste à votre disposition.</p>
+    <p>Nous vous prions d’agréer, Madame, Monsieur, l’expression de nos salutations distinguées.</p>
+    <div class="letter-sign"><span>Pour le Président et par délégation,</span><span class="letter-sign-space"></span></div>
+  </article>`;
+}
+function relances(year, params) {
+  const id = params?.get('id');
+  const all = M.recovery().list;
+  const list = id ? all.filter(c => c.id === id) : all.filter(c => c.stage === 'À relancer');
+  return {title: 'Courriers de relance', back: '#/redevance?tab=recouvrement', letters: list, single: !!id};
+}
+
+const FICHES = {rs: {label: 'Redevance spéciale', build: rs}, relances: {label: 'Recouvrement', build: relances}};
 
 export function render({year, sub, params}) {
   const key = FICHES[sub] ? sub : 'rs';
   const y = Number(params.get('an')) || year;
-  const f = FICHES[key].build(y);
+  const f = FICHES[key].build(y, params);
   const now = new Date();
+  if (f.letters) {
+    const noAddr = f.letters.filter(c => !c.address).length;
+    const steps = {};
+    for (const c of f.letters) { const st = M.nextRelance(c); steps[st] = (steps[st] || 0) + 1; }
+    return `
+  <div class="report-tools">
+    <a class="crumb" href="${f.back}">${icon('left', 14)}${esc(FICHES[key].label)}</a>
+    <span class="toolbar-gap"></span>
+    ${f.letters.length ? `<button class="btn" data-mark-all>${icon('check', 15)}Marquer ${f.letters.length > 1 ? `les ${f.letters.length} relances` : 'la relance'} comme envoyée${f.letters.length > 1 ? 's' : ''}</button>
+    <button class="btn btn-primary" data-print>${icon('download', 15)}Enregistrer en PDF</button>` : ''}
+  </div>
+  <p class="report-hint">${f.letters.length ? `${f.letters.length} courrier${f.letters.length > 1 ? 's' : ''}, un par page (${Object.entries(steps).map(([k, n]) => `${n} ${k === 'Mise en demeure' ? 'dernier rappel' : k.toLowerCase()}`).join(', ')}). À signer par une personne habilitée avant envoi.${noAddr ? ` <b>${noAddr} sans adresse</b> : complétez la fiche entreprise avant d’imprimer.` : ''} Après l’envoi, marquez les relances : l’étape avance et un rappel est daté à ${M.RELANCE_DELAY} jours.` : 'Aucun dossier à relancer : il faut un titre émis et un reste impayé.'}</p>
+  ${f.letters.map(c => letter(c, now)).join('')}`;
+  }
   const ys = [...new Set([...(f.years || []), y])].sort((a, b) => b - a).slice(0, 6);
   return `
   <div class="report-tools">
@@ -159,10 +216,28 @@ export function render({year, sub, params}) {
 
 export function mount(root, {sub, params, year}) {
   document.body.classList.add('is-report');
-  root.querySelector('[data-print]').addEventListener('click', () => {
+  root.querySelector('[data-mark-all]')?.addEventListener('click', async e => {
+    const f = FICHES.relances.build(year, params);
+    const n = f.letters.length;
+    const ok = await confirmDialog({title: `Marquer ${n > 1 ? `${n} relances` : 'la relance'} comme envoyée${n > 1 ? 's' : ''} ?`,
+      message: `À faire seulement une fois les courriers partis. Chaque dossier passe à l’étape suivante, le journal reçoit une ligne datée et un rappel est fixé à ${M.RELANCE_DELAY} jours.`, confirm: 'Marquer envoyé'});
+    if (!ok) return;
+    e.target.disabled = true;
+    const before = f.letters.map(c => ['UpdateRecord', 'Entreprises_RS', c.rowId, fieldsFor('Entreprises_RS', {
+      Etape_Actuelle: c.raw.Etape_Actuelle ?? null, Prochaine_Action: c.raw.Prochaine_Action ?? null, Date_Prochaine_Action: c.raw.Date_Prochaine_Action ?? null,
+      Notes: c.raw.Notes ?? null, Pilote_Dossier: c.raw.Pilote_Dossier ?? null, Derniere_MAJ: c.raw.Derniere_MAJ ?? null})]);
+    try {
+      await act(f.letters.map(c => ['UpdateRecord', 'Entreprises_RS', c.rowId, fieldsFor('Entreprises_RS', M.relanceFields(c, author()).fields)]));
+      location.hash = f.back;
+      toast(`${n} relance${n > 1 ? 's' : ''} enregistrée${n > 1 ? 's' : ''}`, 'ok', {action: 'Annuler', timeout: 9000, onAction: async () => {
+        try { await act(before); toast('Relances annulées', 'info'); } catch (err) { toast(err.message, 'error'); }
+      }});
+    } catch (err) { toast(err.message, 'error'); e.target.disabled = false; }
+  });
+  root.querySelector('[data-print]')?.addEventListener('click', () => {
     const title = document.title;
     const label = FICHES[sub]?.label || 'Synthèse';
-    document.title = `${label} ${Number(params.get('an')) || year} - synthèse CADEMA`;
+    document.title = sub === 'relances' ? `Courriers de relance RS ${new Date().toLocaleDateString('fr-CA')} - CADEMA` : `${label} ${Number(params.get('an')) || year} - synthèse CADEMA`;
     addEventListener('afterprint', () => { document.title = title; }, {once: true});
     print();
   });

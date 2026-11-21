@@ -11,8 +11,7 @@ import { author } from '../main.js';
 const stageTone = s => M.RECOVERY_STAGES.find(x => x.key === s)?.tone || 'neutral';
 const st = {stage: '', q: ''};
 const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
-const nextRelance = c => c.relances >= 2 ? 'Mise en demeure' : `Relance ${c.relances + 1}`;
+const nextRelance = M.nextRelance;
 
 function filtered(rec) {
   const words = norm(st.q).split(/\s+/).filter(Boolean);
@@ -61,6 +60,7 @@ export function render() {
     <div class="toolbar card-toolbar">
       <label class="search-field">${icon('search', 16)}<input class="input" type="search" placeholder="Entreprise, SIRET, n° de titre…" value="${attr(st.q)}" data-keep="reco-q" aria-label="Rechercher un dossier"></label>
       <span class="toolbar-gap"></span>
+      ${rec.counts['À relancer'] ? `<a class="btn btn-sm" href="#/fiche/relances">${icon('download', 14)}Courriers de relance (PDF) <span class="chip-n">${rec.counts['À relancer']}</span></a>` : ''}
       <span class="muted result-count">${list.length} / ${rec.list.length}</span>
     </div>
     <div class="chips-row" role="group" aria-label="Étape">
@@ -77,7 +77,7 @@ export function render() {
 
 /* ── Fiche de relance ──────────────────────────────────────────────── */
 const titled = c => c.years.filter(y => /titre [ée]mis|partiel/i.test(y.situation));
-const relanceYears = c => titled(c).length ? titled(c) : c.years;
+const relanceYears = M.relanceYears;
 
 function mailText(c) {
   const ys = relanceYears(c);
@@ -136,7 +136,7 @@ function fiche(id) {
       <div class="span-2">${field('Journal', `<textarea name="Notes" rows="4">${esc(c.notes)}</textarea>`, 'Chaque relance marquée ajoute une ligne datée en tête.')}</div>
       <div class="span-2 form-actions"><span class="muted">Écrit dans Entreprises_RS</span><button type="submit" class="btn">${icon('check', 15)}Enregistrer le suivi</button></div>
     </form>`;
-  const footer = `<button class="btn btn-ghost" data-close>Fermer</button>
+  const footer = `<a class="btn btn-ghost left" href="#/fiche/relances?id=${encodeURIComponent(c.id)}">${icon('download', 15)}Courrier PDF</a><button class="btn btn-ghost" data-close>Fermer</button>
     <button class="btn btn-primary" data-mark>${icon('check', 15)}Marquer « ${esc(nextRelance(c))} » envoyée</button>`;
   return {c, title, subtitle, body, footer, today};
 }
@@ -173,18 +173,11 @@ function bind(el, id) {
     if (mark) {
       const c = company();
       if (!c) return;
-      const step = nextRelance(c);
-      const today = new Date();
-      const ys = relanceYears(c);
-      const line = `${today.toLocaleDateString('fr-FR')} · ${step} envoyée par ${author()} · ${fmt.eurc(ys.reduce((s, y) => s + y.rest, 0))} relancés (${ys.map(y => y.year).join(', ')})`;
+      const {step, next, fields} = M.relanceFields(c, author());
       mark.disabled = true;
       try {
-        await act([['UpdateRecord', 'Entreprises_RS', c.rowId, fieldsFor('Entreprises_RS', {
-          Etape_Actuelle: step, Prochaine_Action: step === 'Mise en demeure' ? 'Préparer la mise en demeure' : 'Vérifier le paiement',
-          Date_Prochaine_Action: M.toGristDate(addDays(today, 15)), Notes: c.notes ? `${line}\n${c.notes}` : line,
-          Pilote_Dossier: c.pilot || author(), Derniere_MAJ: M.nowSeconds(),
-        })]]);
-        toast(`${step} enregistrée · prochain point le ${fmt.date(addDays(today, 15))}`);
+        await act([['UpdateRecord', 'Entreprises_RS', c.rowId, fieldsFor('Entreprises_RS', fields)]]);
+        toast(`${step} enregistrée · prochain point le ${fmt.date(next)}`);
         openReco(id);
         flash(document.querySelector(`tr[data-reco="${CSS.escape(id)}"]`));
       } catch (err) { toast(err.message, 'error'); mark.disabled = false; }
