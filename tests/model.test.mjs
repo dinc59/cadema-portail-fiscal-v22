@@ -160,7 +160,10 @@ assert.equal(M.gemapiProduct(2024).amount, 1350550); assert.equal(M.gemapiProduc
 assert.deepEqual(M.gemapiHistory(2027).map(h => h.year), [2022, 2023, 2024, 2025, 2026]);
 db.tables.Taxes = [{id: 1, Code: 'GEMAPI', Exercice: 2027, Produit: 3500000, Statut: 'Définitif'}];
 assert.equal(M.gemapiProduct(2027).amount, 3500000); assert.equal(M.gemapiProduct(2027).origin, 'grist');
-assert.equal(M.GEMAPI.ceiling - M.GEMAPI.voted[2026], 727971);
+assert.equal(M.gemapiCeiling().ceiling - M.GEMAPI.voted[2026], 1305411, 'plafond sur la population INSEE 2026');
+db.tables.Parametres = [{id: 1, Cle: 'POPULATION_DGF', Valeur: '116 500'}];
+assert.equal(M.gemapiCeiling().ceiling, 4660000, 'la population DGF saisie dans Grist l’emporte');
+db.tables.Parametres = [];
 // Une taxe additionnelle apparaît dans le budget principal dès qu'un produit est saisi
 db.tables.Taxes = [{id: 1, Code: 'TFPB', Exercice: 2027, Produit: 3894417, Statut: 'Prévision'}];
 const p27 = M.revenueByBudget(2027).find(b => b.key === 'Principal');

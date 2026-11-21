@@ -19,7 +19,7 @@ assert.match(root.querySelector('[data-rate="CFE"].rate-card').textContent, /Pla
 const prop = root.querySelector('#propositions').textContent.replace(/\s+/g, ' ');
 assert.match(prop, /\+ 6[\s ]994[\s ]870 €/u); assert.match(prop, /TFPB additionnelle.*0 %.*6,71 %.*\+ 3[\s ]894[\s ]417 €/u);
 const gem = root.querySelector('#gemapi').textContent.replace(/\s+/g, ' ');
-assert.match(gem, /3[\s ]294[\s ]189 € votés pour 2026/u); assert.match(gem, /727[\s ]971 €/u);
+assert.match(gem, /3[\s ]294[\s ]189 € votés pour 2026/u); assert.match(gem, /1[\s\u202f]305[\s\u202f]411 €/u); assert.match(gem, /4[\s\u202f]599[\s\u202f]600 €/u); assert.match(gem, /28,65 €/); assert.match(gem, /114[\s\u202f]990 habitants/u);
 assert.match(gem, /baisse de 1[\s ]943[\s ]639 € par an \(−59,0 %\)/u);
 assert.match(gem, /hypothèse « reconduction du produit actuel »/);
 assert.equal(root.querySelectorAll('.gb').length, 6, '2022 à 2026 + 2027 à arrêter');
