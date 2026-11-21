@@ -57,7 +57,7 @@ function proposalCard(current) {
       <td>${!changed ? badge('Inchangé', 'neutral') : nxt.proposed ? badge('Proposé', 'warn') : badge('Voté', 'good')}</td></tr>`;
   };
   return `<article class="card mt" id="propositions">
-    <div class="card-head"><div><p class="card-eyebrow">Pacte financier et fiscal</p><h2>Évolutions proposées pour ${y}</h2>
+    <div class="card-head"><div><p class="card-eyebrow">Pacte financier et fiscal</p><h2>Les mesures soumises au vote</h2>
       <p class="card-sub">Soumises au conseil communautaire du ${esc(M.PROPOSAL.vote)} : ce sont des propositions tant que le vote n’a pas eu lieu.</p></div>
       ${badge(`+ ${fmt.short(total)} attendus`, 'good')}</div>
     <div class="table-wrap"><table class="t">
@@ -105,12 +105,11 @@ function gemapiCard(current) {
 function checksCard() {
   const list = M.rateChecks();
   if (!list.length) return `<div class="notice notice-good mt">${icon('check', 16)}<span>Aucun taux ni plafond en attente de confirmation.</span></div>`;
-  return `<article class="card mt checks-card" id="a-confirmer">
-    <div class="card-head"><div><p class="card-eyebrow">Avant de diffuser</p><h2>${list.length} chiffre${list.length > 1 ? 's' : ''} à confirmer</h2>
-      <p class="card-sub">Ces valeurs ne reposent pas encore sur une pièce officielle. Ne les présentez pas comme sûres : chaque point disparaît dès qu’il est confirmé dans Grist.</p></div>
-      ${badge('À confirmer', 'warn')}</div>
+  return `<details class="card mt checks-card" id="a-confirmer">
+    <summary class="checks-sum">${icon('alert', 16)}<b>${list.length} chiffre${list.length > 1 ? 's' : ''} à confirmer</b><span class="muted">avant de les présenter comme sûrs</span><span class="checks-more">Voir ${icon('chevron', 14)}</span></summary>
+    <p class="card-sub checks-intro">Ces valeurs ne reposent pas encore sur une pièce officielle. Chaque point disparaît dès qu’il est confirmé dans Grist.</p>
     <ul class="checks-list">${list.map(c => `<li><span class="checks-code">${esc(c.code)}</span><span class="row-main"><b>${esc(c.title)}</b><span>${esc(c.detail || '')}</span><span class="checks-how">${icon('right', 13)}${esc(c.how)}</span></span></li>`).join('')}</ul>
-  </article>`;
+  </details>`;
 }
 
 /* ── Simulateur ───────────────────────────────────────────────────── */
@@ -149,7 +148,7 @@ function simCard(current) {
 }
 
 /* ── Référentiel ──────────────────────────────────────────────────── */
-function refCard() {
+export function refCard() {
   const inGrist = M.refInGrist();
   const n = rows(M.REF_TABLE).length;
   const missingParams = M.paramSeed();
@@ -166,7 +165,7 @@ function refCard() {
   </article>`;
 }
 
-async function createRef(btn) {
+export async function createRef(btn) {
   const inGrist = M.refInGrist();
   const params = M.paramSeed();
   const ok = await confirmDialog({title: inGrist ? 'Ajouter les paramètres ?' : 'Copier le référentiel dans Grist ?',
@@ -201,24 +200,29 @@ function calendarCard() {
     <div class="card-body"><ol class="rate-steps">${steps.map(([d, t], i) => `<li${i === steps.length - 1 ? ' class="is-later"' : ''}><b>${esc(d)}</b><span>${esc(t)}</span></li>`).join('')}</ol></div></article>`;
 }
 
-export function render({year}) {
+const TABS = [
+  ['taux', 'Taux en vigueur', 'target'],
+  ['2027', `Propositions ${M.PROPOSAL.year}`, 'chart'],
+  ['gemapi', 'GEMAPI', 'landmark'],
+];
+const taxTabs = tab => `<div class="toolbar"><nav class="tabs" aria-label="Vues">${TABS.map(([k, l, ic]) =>
+  `<a href="#/taux${k === 'taux' ? '' : `?tab=${k}`}"${tab === k ? ' aria-current="page"' : ''}>${icon(ic, 15)}${esc(l)}${k === 'taux' && M.rateChecks().length ? ` <span class="count">${M.rateChecks().length}</span>` : ''}</a>`).join('')}</nav></div>`;
+
+export function render({year, params}) {
   const current = Math.max(year, new Date().getFullYear());
   const horizon = M.rateHorizon(current);
   const first = M.FIRST_FISCAL_YEAR;
   const codes = [...CURRENT, 'TFPB', 'TFPNB', 'THRS'];
-  return `
-  <section class="ph">
-    <div><p class="ph-eyebrow">Fiscalité</p><h1>Taux votés et évolutions prévues</h1>
-      <p class="ph-lede">Les taux en vigueur depuis la création de la CADEMA (31 décembre 2015), les évolutions proposées pour ${M.PROPOSAL.year} et le produit GEMAPI. Cliquez un taux pour son historique, sa source et sa délibération.</p></div>
-    <div class="ph-actions"><button class="btn btn-primary" data-rates-print>${icon('download', 16)}Fiche des taux (PDF)</button></div>
-  </section>
-
+  const tab = TABS.some(t => t[0] === params?.get?.('tab')) ? params.get('tab') : 'taux';
+  const head = {
+    taux: ['Taux votés', 'Les taux en vigueur depuis la création de la CADEMA (31 décembre 2015). Cliquez un taux pour son historique, sa source et sa délibération.'],
+    2027: [`Évolutions proposées pour ${M.PROPOSAL.year}`, `Ce qui est soumis au conseil du ${M.PROPOSAL.vote}, ce que ça rapporterait, et un simulateur pour tester d’autres taux.`],
+    gemapi: ['Taxe GEMAPI', 'Produit voté chaque année, plafond légal et marge restante.'],
+  }[tab];
+  const body = {
+    taux: () => `
   <section class="grid g-3 rate-grid">${CURRENT.map(c => rateCard(c, current, horizon)).join('')}</section>
-
   ${checksCard()}
-  ${proposalCard(current)}
-  ${simCard(current)}
-
   <article class="card mt rate-timeline-card">
     <div class="card-head"><div><p class="card-eyebrow">Trajectoire</p><h2>${first} – ${horizon}</h2>
       <p class="card-sub">Une bande par taxe ; chaque segment est une période à taux constant. Les segments rayés sont proposés au vote, non encore adoptés.</p></div></div>
@@ -231,12 +235,18 @@ export function render({year}) {
       <div class="legend mt"><span><span class="hatch"></span> proposé, non encore voté</span><span class="muted">Bande claire : taux à confirmer sur délibération</span></div>
     </div>
   </article>
-
-  ${gemapiCard(current)}
-  ${calendarCard()}
-
-  ${refCard()}
-  <div class="notice mt">${icon('info', 16)}<span>Un taux voté se saisit dans <b>Recettes</b>, sur la fiche du produit (colonne Taux de l’exercice) : il l’emporte sur la valeur de référence et retire la mention « proposé ». Le produit GEMAPI se saisit de même avec le code <b>GEMAPI</b> dans la table Taxes.</span></div>`;
+  <p class="muted tab-note">${icon('info', 14)} Un taux voté se saisit dans <b>Recettes</b> (colonne Taux de l’exercice) : il l’emporte sur la référence. Le référentiel des taux se gère dans <a class="link" href="#/equipe">Équipe &amp; paramètres</a>.</p>`,
+    2027: () => `${proposalCard(current)}${simCard(current)}${calendarCard()}`,
+    gemapi: () => `${gemapiCard(current)}
+  <p class="muted tab-note">${icon('info', 14)} Le produit GEMAPI voté se saisit dans la table Taxes avec le code <b>GEMAPI</b> ; la population DGF, dans Parametres (POPULATION_DGF).</p>`,
+  }[tab]();
+  return `
+  <section class="ph">
+    <div><p class="ph-eyebrow">Fiscalité</p><h1>${esc(head[0])}</h1><p class="ph-lede">${esc(head[1])}</p></div>
+    <div class="ph-actions"><button class="btn btn-primary" data-rates-print>${icon('download', 16)}Imprimer (PDF)</button></div>
+  </section>
+  ${taxTabs(tab)}
+  ${body}`;
 }
 
 function rateDrawer(code) {
@@ -295,6 +305,7 @@ export function mount(root, {year} = {}) {
   const open = el => rateDrawer(el.dataset.rate);
   const simBox = root.querySelector('[data-sim-body]');
   root.addEventListener('input', e => {
+    if (!simBox) return;
     const inp = e.target.closest('[data-sim]');
     if (!inp) return;
     const v = Number(String(inp.value).replace(',', '.'));
@@ -312,13 +323,11 @@ export function mount(root, {year} = {}) {
     simBox.querySelector('.sim-compare').innerHTML = tmp.querySelector('.sim-compare').innerHTML;
   });
   root.addEventListener('click', e => {
-    if (e.target.closest('[data-sim-reset]')) { sim.rates = simDefaults(current); simBox.innerHTML = simBody(current); return; }
-    const rc = e.target.closest('[data-ref-create]');
-    if (rc) { createRef(rc); return; }
+    if (e.target.closest('[data-sim-reset]') && simBox) { sim.rates = simDefaults(current); simBox.innerHTML = simBody(current); return; }
     const card = e.target.closest('[data-rate]');
     if (card) { open(card); return; }
     const jump = e.target.closest('tr[data-href="#gemapi"]');
-    if (jump) { root.querySelector('#gemapi')?.scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
+    if (jump) { location.hash = '#/taux?tab=gemapi'; return; }
     if (e.target.closest('[data-rates-print]')) {
       const title = document.title;
       document.title = `Taux votés CADEMA ${new Date().getFullYear()}`;

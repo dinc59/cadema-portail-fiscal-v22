@@ -538,12 +538,12 @@ function revenueLine(code, year) {
   if (code === 'GEMAPI') {
     const g = gemapiProduct(year), q = gemapiProduct(year - 1);
     return {code, label: 'Taxe GEMAPI (produit voté)', kind: 'gemapi', amount: g?.amount ?? null, status: g?.status || null,
-      source: g?.source || '', prev: q?.amount ?? null, href: '#/taux'};
+      source: g?.source || '', prev: q?.amount ?? null, href: '#/taux?tab=gemapi'};
   }
   if (RATE_INFO[code]?.additional) {
     const c = taxCell(code, year), prev = taxCell(code, year - 1);
     return {code, label: RATE_INFO[code].label, kind: 'fiscal', amount: c?.amount ?? null, status: c?.status || null,
-      source: c?.source || '', prev: prev?.amount ?? null, forecast: null, realised: null, href: '#/taux', optional: true};
+      source: c?.source || '', prev: prev?.amount ?? null, forecast: null, realised: null, href: '#/taux?tab=2027', optional: true};
   }
   if (code === 'RS') {
     const r = rsYear(year), q = rsYear(year - 1);

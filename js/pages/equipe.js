@@ -1,6 +1,7 @@
 import * as M from '../model.js';
 import { rows, db } from '../grist.js';
 import { esc, icon, fmt, badge, avatar } from '../ui.js';
+import { refCard, createRef } from './taux.js';
 
 const HIDDEN = new Set(['PORTAL_STATE_JSON', 'PORTAL_STATE_UPDATED_AT']);
 
@@ -29,5 +30,13 @@ export function render({app}) {
         <button class="btn btn-sm mt" data-refresh>${icon('refresh', 14)}Relire maintenant</button>
       </article>
     </aside>
-  </section>`;
+  </section>
+  ${refCard()}`;
+}
+
+export function mount(root) {
+  root.addEventListener('click', e => {
+    const rc = e.target.closest('[data-ref-create]');
+    if (rc) createRef(rc);
+  });
 }

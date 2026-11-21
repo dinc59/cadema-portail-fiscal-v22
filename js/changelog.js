@@ -3,6 +3,13 @@
    La plus récente en premier. `id` sert à savoir ce qu'un agent a déjà vu. */
 export const CHANGELOG = [
   {
+    id: '22.21', date: '2026-11-21', title: 'Taux : une page en trois onglets',
+    summary: 'La page Taux était trop chargée : elle se lit maintenant en trois onglets.',
+    items: [
+      {tag: 'Amélioré', text: 'Taux en vigueur (taux, trajectoire, chiffres à confirmer repliés), Propositions 2027 (mesures, simulateur, calendrier) et GEMAPI ont chacun leur onglet. Le référentiel des taux passe dans Équipe & paramètres.', href: '#/taux'},
+    ],
+  },
+  {
     id: '22.20', date: '2026-11-21', title: 'Contacts : l’annuaire du pôle',
     summary: 'Préfecture, DGFiP, comptable public, URSSAF, communes : chaque interlocuteur a sa fiche, ses coordonnées en un clic et l’historique des échanges.',
     items: [
@@ -16,8 +23,8 @@ export const CHANGELOG = [
     summary: 'Les chiffres incertains sont signalés, les taux se simulent, le référentiel se corrige dans Grist et les relances s’impriment en série.',
     items: [
       {tag: 'Nouveau', text: 'Taux › Chiffres à confirmer : la liste de ce qui ne repose pas encore sur une pièce officielle (taux VM 2019 et 2021, plafond CFE, population DGF, taux encore « proposés » après le vote). Chaque point disparaît dès qu’il est confirmé dans Grist. Aussi dans Qualité des données.', href: '#/taux'},
-      {tag: 'Nouveau', text: 'Taux › Simulateur : changez un taux, le produit et l’écart se recalculent, avec alerte au-dessus du plafond connu. Bases déduites des simulations DGFiP, remplaçables par celles de l’état 1259 (Parametres, BASE_…).', href: '#/taux'},
-      {tag: 'Nouveau', text: 'Taux › Référentiel : un clic copie les taux de référence dans une table Grist (Referentiel_Taux) et les gains, plafonds et bases dans Parametres. Ensuite, on corrige un taux directement dans Grist, sans mise à jour du portail.', href: '#/taux'},
+      {tag: 'Nouveau', text: 'Taux › Propositions 2027 › Simulateur : changez un taux, le produit et l’écart se recalculent, avec alerte au-dessus du plafond connu. Bases déduites des simulations DGFiP, remplaçables par celles de l’état 1259 (Parametres, BASE_…).', href: '#/taux?tab=2027'},
+      {tag: 'Nouveau', text: 'Équipe & paramètres › Référentiel des taux : un clic copie les taux de référence dans une table Grist (Referentiel_Taux) et les gains, plafonds et bases dans Parametres. Ensuite, on corrige un taux directement dans Grist, sans mise à jour du portail.', href: '#/equipe'},
       {tag: 'Nouveau', text: 'Recouvrement › Courriers de relance (PDF) : un courrier par page pour chaque dossier à relancer, prêt à signer ; le ton suit l’étape (rappel, second rappel, dernier rappel avant transmission au comptable public). Un bouton marque ensuite toutes les relances envoyées, avec Annuler.', href: '#/redevance?tab=recouvrement'},
       {tag: 'Amélioré', text: 'Documents : remplacer le fichier d’un document propose « Annuler » pour revenir à l’ancien. La délibération d’un taux se modifie ou se remplace depuis la fiche du taux.', href: '#/documents'},
     ],

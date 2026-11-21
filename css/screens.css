@@ -487,3 +487,12 @@ body.no-enter .siret-ok { animation: none; }
 }
 .ct-org .ic { color: hsl(var(--h) 50% 42%); flex: none; }
 .ct-flat { margin-top: 18px; }
+/* Taux : onglets */
+.checks-card { padding: 0; }
+.checks-sum { list-style: none; display: flex; align-items: center; gap: 10px; padding: 14px 20px; cursor: pointer; }
+.checks-sum::-webkit-details-marker { display: none; }
+.checks-sum .ic:first-child { color: var(--warn); }
+.checks-more { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-size: 13px; font-weight: 500; }
+.checks-card[open] .checks-more .ic { transform: rotate(180deg); }
+.checks-intro { padding: 0 20px 10px; }
+.tab-note { display: flex; align-items: center; gap: 6px; margin-top: 18px; font-size: 13px; }

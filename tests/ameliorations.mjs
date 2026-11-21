@@ -62,6 +62,8 @@ assert.match(root.querySelector('[data-rate="CFE"].rate-card').textContent, /Inc
 assert.match(clean(root.querySelector('[data-rate="VM"].rate-card').textContent), /4 taux successifs/);
 const chk = clean(root.querySelector('#a-confirmer').textContent);
 assert.match(chk, /4 chiffres à confirmer/); assert.match(chk, /Plafond CFE : 18,94 %/); assert.match(chk, /18,62 %/); assert.match(chk, /POPULATION_DGF/);
+const c2027 = {year: 2026, params: new URLSearchParams('tab=2027')};
+root.innerHTML = taux.render(c2027); taux.mount(root, c2027);
 const simTxt = () => clean(root.querySelector('#simulateur').textContent);
 assert.match(simTxt(), /correspond aux propositions/); assert.match(simTxt(), /\+ 6 994 87\d €/);
 const teom = root.querySelector('[data-sim="TEOM"]'); teom.value = '15'; teom.dispatchEvent(new Event('input', {bubbles: true}));
@@ -70,6 +72,8 @@ assert.equal(document.activeElement === teom || root.contains(teom), true, 'le c
 const cfe = root.querySelector('[data-sim="CFE"]'); cfe.value = '19'; cfe.dispatchEvent(new Event('input', {bubbles: true}));
 assert.ok(root.querySelector('[data-sim="CFE"]').closest('tr').classList.contains('is-over')); assert.match(simTxt(), /au-dessus du plafond 18,94 %/);
 root.querySelector('[data-sim-reset]').click(); assert.match(simTxt(), /correspond aux propositions/);
+const equipe = await import(`${repo}/js/pages/equipe.js`);
+root.innerHTML = equipe.render({app: {profile: ''}}); equipe.mount(root);
 assert.match(clean(root.querySelector('#referentiel').textContent), /14 lignes/);
 root.querySelector('[data-ref-create]').click(); await wait(20);
 document.querySelector('.modal button.btn-primary').click(); await wait(80);
@@ -78,8 +82,9 @@ assert.equal(sent[1][0], 'BulkAddRecord'); assert.equal(sent[1][2].length, 14);
 assert.equal(sent[2][1], 'Parametres'); assert.ok(sent[2][3].Cle.includes('BASE_TFPB'));
 assert.equal(db.tables.Referentiel_Taux.length, 14, 'table relue après création');
 assert.equal(M.rateFor('TEOM', 2027).rate, 17.4); assert.ok(M.refInGrist());
-root.innerHTML = taux.render(ctx); taux.mount(root, ctx);
+root.innerHTML = equipe.render({app: {profile: ''}}); equipe.mount(root);
 assert.ok(!root.querySelector('#referentiel'), 'plus de carte une fois créé'); assert.match(root.textContent, /lus dans Grist/);
+root.innerHTML = taux.render(ctx); taux.mount(root, ctx);
 root.querySelector('[data-rate="VM"]').click(); await wait(10);
 assert.ok(document.querySelector('[role="dialog"] a[href="#/documents?doc=3"]'), 'délibération modifiable depuis la fiche du taux');
 document.querySelector('[data-close]')?.click();
