@@ -16,6 +16,7 @@ import * as reunion from './pages/reunion.js';
 import * as rapport from './pages/rapport.js';
 import * as taux from './pages/taux.js';
 import * as fiche from './pages/fiche.js';
+import * as contacts from './pages/contacts.js';
 import { unseen } from './changelog.js';
 import { installUpdateCheck } from './update.js';
 
@@ -41,11 +42,12 @@ const NAV = [
   {id: 'finances', label: 'Finances', href: '#/finances', menu: 'finances'},
   {id: 'pilotage', label: 'Pilotage', href: '#/pilotage', menu: 'pilotage'},
   {id: 'documents', label: 'Documents', href: '#/documents'},
+  {id: 'contacts', label: 'Contacts', href: '#/contacts'},
 ];
 export const CREDIT = '© 2026, Made with ❤️ by Dina-Ben';
 const creditLine = (cls = '') => `<p class="credit${cls ? ` ${cls}` : ''}">${CREDIT}</p>`;
 
-const PAGES = {accueil, recettes, redevance, finances, pilotage, documents, equipe, nouveautes, reunion, rapport, taux, fiche};
+const PAGES = {accueil, recettes, redevance, finances, pilotage, documents, equipe, nouveautes, reunion, rapport, taux, fiche, contacts};
 
 /* Fonds disponibles. « Tamisé » est un sombre adouci, plus clair que « Sombre ». */
 const THEMES = [
@@ -279,6 +281,8 @@ function paletteItems() {
     ...M.TAXES.map(t => ({kind: 'Recette', label: `${t.code} · ${t.label}`, href: `#/recettes/${t.code}`, ic: 'coins'})),
     ...M.companies().map(c => ({kind: 'Entreprise', label: c.name, sub: [c.activity, c.siret].filter(Boolean).join(' · '), href: `#/redevance/${encodeURIComponent(c.id)}`, ic: 'building'})),
     ...M.documents().map(d => ({kind: 'Document', label: d.title, sub: [d.type, d.year].filter(Boolean).join(' · '), href: `#/documents?q=${encodeURIComponent(d.title)}`, ic: 'file'})),
+    {kind: 'Page', label: 'Nouveau contact', href: '#/contacts?new=1', ic: 'plus'},
+    ...M.contacts().map(c => ({kind: 'Contact', label: c.name, sub: [c.role, c.org, c.mobile || c.phone ? M.prettyPhone(c.mobile || c.phone) : '', c.tags.join(', ')].filter(Boolean).join(' · '), href: `#/contacts?c=${c.rowId}`, ic: 'user'})),
     ...M.tasks().map(t => ({kind: 'Priorité', label: t.title, sub: t.status, href: '#/pilotage', ic: 'list'})),
   ];
   return items.map(i => ({...i, key: norm(`${i.label} ${i.sub || ''} ${i.kind}`)}));

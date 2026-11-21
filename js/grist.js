@@ -11,7 +11,7 @@ export const TABLES = [
 ];
 /* Tables facultatives : créées depuis le portail quand l'équipe le décide.
    Leur absence n'est pas une anomalie (pas de bandeau d'alerte). */
-export const OPTIONAL_TABLES = ['Referentiel_Taux'];
+export const OPTIONAL_TABLES = ['Referentiel_Taux', 'Contacts'];
 
 export const db = {
   status: 'loading',      // loading | ready | denied | offline

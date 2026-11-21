@@ -239,6 +239,84 @@ export function relanceFields(c, who, today = new Date()) {
   }};
 }
 
+/* ── Contacts ─────────────────────────────────────────────────────── */
+/* Annuaire du pôle : une table Grist « Contacts », créée depuis le portail.
+   Le journal des échanges vit dans Notes, une ligne datée par échange, la
+   plus récente en tête (même convention que les relances). */
+export const CONTACT_TABLE = 'Contacts';
+export const CONTACT_COLUMNS = [
+  {id: 'Civilite', type: 'Text'}, {id: 'Prenom', type: 'Text'}, {id: 'Nom', type: 'Text'}, {id: 'Fonction', type: 'Text'},
+  {id: 'Organisme', type: 'Text'}, {id: 'Service', type: 'Text'}, {id: 'Categorie', type: 'Text'},
+  {id: 'Email', type: 'Text'}, {id: 'Telephone', type: 'Text'}, {id: 'Mobile', type: 'Text'}, {id: 'Adresse', type: 'Text'},
+  {id: 'Sujets', type: 'Text'}, {id: 'Notes', type: 'Text'}, {id: 'Dernier_Echange', type: 'Date'}, {id: 'Prochain_Suivi', type: 'Date'},
+  {id: 'Favori', type: 'Bool'}, {id: 'Ajoute_Par', type: 'Text'}, {id: 'Derniere_MAJ', type: 'Int'},
+];
+export const CONTACT_CATEGORIES = [
+  {key: 'État & Préfecture', ic: 'landmark', hue: 210},
+  {key: 'DGFiP & comptable public', ic: 'coins', hue: 176},
+  {key: 'URSSAF & organismes sociaux', ic: 'shield', hue: 262},
+  {key: 'Communes membres', ic: 'home', hue: 28},
+  {key: 'CADEMA (services internes)', ic: 'users', hue: 150},
+  {key: 'Élus', ic: 'user', hue: 350},
+  {key: 'Partenaires & prestataires', ic: 'building', hue: 45},
+  {key: 'Entreprises', ic: 'wallet', hue: 95},
+  {key: 'Autre', ic: 'folder', hue: 0},
+];
+export const EXCHANGE_KINDS = ['Appel', 'E-mail', 'Réunion', 'Courrier', 'Visite', 'Note'];
+export const contactsReady = () => db.tables[CONTACT_TABLE] !== undefined;
+export const categoryOf = key => CONTACT_CATEGORIES.find(c => c.key === key) || CONTACT_CATEGORIES.at(-1);
+export const splitTags = v => [...new Set(text(v).split(/[,;·\n]/).map(t => t.trim()).filter(Boolean))];
+/* Journal : « 21/11/2026 · Appel · texte (par X) », une ligne par échange. */
+export function parseJournal(notes) {
+  return text(notes).split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+    const m = /^(\d{2}\/\d{2}\/\d{4})\s*·\s*(?:([^·]{1,20}?)\s*·\s*)?(.*)$/.exec(l);
+    if (!m) return {date: null, kind: '', text: l};
+    const [d, mo, y] = m[1].split('/').map(Number);
+    return {date: new Date(y, mo - 1, d), kind: EXCHANGE_KINDS.includes(m[2]) ? m[2] : '', text: EXCHANGE_KINDS.includes(m[2]) || !m[2] ? m[3] : `${m[2]} · ${m[3]}`};
+  });
+}
+export const journalLine = (kind, note, who, d = new Date()) => `${d.toLocaleDateString('fr-FR')} · ${kind} · ${note.replace(/\s*\n\s*/g, ' ').trim()}${who && who !== 'Portail' ? ` (${who})` : ''}`;
+export function contacts() {
+  const today = new Date(new Date().toDateString());
+  return rows(CONTACT_TABLE).map(r => {
+    const first = text(r.Prenom), last = text(r.Nom);
+    const name = [first, last].filter(Boolean).join(' ') || text(r.Organisme) || 'Contact sans nom';
+    const next = toDate(r.Prochain_Suivi);
+    return {rowId: r.id, name, first, last, civ: text(r.Civilite), role: text(r.Fonction), org: text(r.Organisme), service: text(r.Service),
+      category: categoryOf(text(r.Categorie)).key, email: text(r.Email), phone: text(r.Telephone), mobile: text(r.Mobile), address: text(r.Adresse),
+      tags: splitTags(r.Sujets), notes: text(r.Notes), journal: parseJournal(r.Notes), lastAt: toDate(r.Dernier_Echange), next,
+      late: !!(next && next < today), dueSoon: !!(next && next >= today && next - today <= 7 * 864e5), fav: r.Favori === true,
+      author: text(r.Ajoute_Par), updated: num(r.Derniere_MAJ), raw: r};
+  }).sort((a, b) => (b.fav - a.fav) || a.org.localeCompare(b.org, 'fr') || a.name.localeCompare(b.name, 'fr'));
+}
+/* Numéro cliquable. Mayotte : 0269 (fixe) et 0639 (mobile) → +262 ; autre 0X → +33. */
+export function intlPhone(v) {
+  const d = text(v).replace(/[^\d+]/g, '');
+  if (!d) return '';
+  if (d.startsWith('+')) return d;
+  if (d.startsWith('00')) return `+${d.slice(2)}`;
+  if (/^0(269|639)\d{6}$/.test(d)) return `+262${d.slice(1)}`;
+  if (/^0\d{9}$/.test(d)) return `+33${d.slice(1)}`;
+  return d;
+}
+/* Mayotte s'écrit 0269 / 0639 suivi de trois paires ; ailleurs, cinq paires. */
+export const prettyPhone = v => { const d = text(v).replace(/[^\d+]/g, '');
+  if (/^0(269|639)\d{6}$/.test(d)) return `${d.slice(0, 4)} ${d.slice(4, 6)} ${d.slice(6, 8)} ${d.slice(8)}`;
+  return /^0\d{9}$/.test(d) ? d.replace(/(\d{2})(?=\d)/g, '$1 ').trim() : text(v); };
+export function vcard(c) {
+  const e = v => String(v || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/([,;])/g, '\\$1');
+  return ['BEGIN:VCARD', 'VERSION:3.0', `N:${e(c.last)};${e(c.first)};;${e(c.civ)};`, `FN:${e(c.name)}`,
+    c.org && `ORG:${e(c.org)}${c.service ? `;${e(c.service)}` : ''}`, c.role && `TITLE:${e(c.role)}`,
+    c.phone && `TEL;TYPE=WORK,VOICE:${intlPhone(c.phone)}`, c.mobile && `TEL;TYPE=CELL:${intlPhone(c.mobile)}`,
+    c.email && `EMAIL;TYPE=INTERNET,WORK:${c.email}`, c.address && `ADR;TYPE=WORK:;;${e(c.address)};;;;`,
+    c.tags.length && `NOTE:${e(`Sujets : ${c.tags.join(', ')}`)}`, 'END:VCARD'].filter(Boolean).join('\r\n');
+}
+/* Doublon probable : même e-mail, ou même nom dans le même organisme. */
+export function contactDuplicate(fields, exceptId) {
+  const email = text(fields.Email).toLowerCase(), key = `${text(fields.Prenom)} ${text(fields.Nom)}|${text(fields.Organisme)}`.toLowerCase().trim();
+  return contacts().find(c => c.rowId !== exceptId && ((email && c.email.toLowerCase() === email) || (`${c.first} ${c.last}|${c.org}`.toLowerCase().trim() === key && key !== '|')));
+}
+
 /* ── Pilotage ──────────────────────────────────────────────────────── */
 export const TASK_STATUSES = ['À traiter', 'En cours', 'En attente', 'Terminé'];
 export const PLAN_STATUSES = ['À lancer', 'En cours', 'À sécuriser', 'Réalisé', 'Abandonné'];

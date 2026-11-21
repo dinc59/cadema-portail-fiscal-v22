@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(dir, '..');
-const files = ['model.test.mjs', 'cfe.test.mjs', 'render.test.mjs', 'taux.render.mjs', 'docs.render.mjs', 'fiche.render.mjs', 'rs.bulk.mjs', 'banner.render.mjs', 'update.test.mjs', 'rs.avis.mjs', 'ameliorations.mjs'];
+const files = ['model.test.mjs', 'cfe.test.mjs', 'render.test.mjs', 'taux.render.mjs', 'docs.render.mjs', 'fiche.render.mjs', 'rs.bulk.mjs', 'banner.render.mjs', 'update.test.mjs', 'rs.avis.mjs', 'ameliorations.mjs', 'contacts.mjs'];
 let failed = 0;
 for (const f of files) {
   const r = spawnSync(process.execPath, [path.join(dir, f), repo], {encoding: 'utf8'});
