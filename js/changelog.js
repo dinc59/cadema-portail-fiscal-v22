@@ -6,7 +6,7 @@ export const CHANGELOG = [
     id: '22.20', date: '2026-11-21', title: 'Contacts : l’annuaire du pôle',
     summary: 'Préfecture, DGFiP, comptable public, URSSAF, communes : chaque interlocuteur a sa fiche, ses coordonnées en un clic et l’historique des échanges.',
     items: [
-      {tag: 'Nouveau', text: 'Menu Contacts : fiches rangées par catégorie, favoris épinglés, recherche par nom, organisme, sujet ou téléphone. Un bouton crée l’annuaire dans Grist (table Contacts) la première fois.', href: '#/contacts'},
+      {tag: 'Nouveau', text: 'Menu Contacts : fiches rangées par catégorie (dont une catégorie réseaux et associations, pour le GART), favoris épinglés, recherche par nom, organisme, sujet ou téléphone. Un bouton crée l’annuaire dans Grist (table Contacts) la première fois.', href: '#/contacts'},
       {tag: 'Nouveau', text: 'Fiche contact : appeler, écrire, WhatsApp, copier les coordonnées ou télécharger la carte de visite pour le téléphone ; sujets suivis ; journal daté des échanges et prochain suivi, signalé en rouge quand il est dépassé.', href: '#/contacts'},
       {tag: 'Nouveau', text: 'Recherche (Ctrl K) : les contacts y apparaissent, avec leur fonction, leur organisme et leur numéro. Export CSV de l’annuaire.'},
     ],

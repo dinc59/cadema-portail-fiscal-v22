@@ -258,6 +258,7 @@ export const CONTACT_CATEGORIES = [
   {key: 'Communes membres', ic: 'home', hue: 28},
   {key: 'CADEMA (services internes)', ic: 'users', hue: 150},
   {key: 'Élus', ic: 'user', hue: 350},
+  {key: 'Réseaux & associations (GART…)', ic: 'map', hue: 225},
   {key: 'Partenaires & prestataires', ic: 'building', hue: 45},
   {key: 'Entreprises', ic: 'wallet', hue: 95},
   {key: 'Autre', ic: 'folder', hue: 0},
