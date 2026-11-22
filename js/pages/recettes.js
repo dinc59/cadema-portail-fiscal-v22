@@ -10,7 +10,7 @@ const statusTone = s => ({'Définitif': 'good', 'Notifié': 'good', 'Renseigné'
 const dc = v => v > 0 ? 'up' : v < 0 ? 'down' : '';
 const filled = v => v !== null && v !== undefined && v !== '';
 /* Taux : la colonne est libre dans Grist (0,325 — 32,5 — « 32,5 % »). */
-function fmtTaux(v) {
+export function fmtTaux(v) {
   if (!filled(v)) return '—';
   const n = typeof v === 'number' ? v : M.num(String(v).replace('%', ''));
   if (n === null) return String(v);
@@ -162,6 +162,7 @@ function detail({year, params}, t) {
       <p class="ph-lede">${known.length} exercice(s) renseigné(s)${lastUpdate ? ` · mise à jour le ${esc(lastUpdate.toLocaleDateString('fr-FR'))}` : ''}. ${esc(t.about)}</p>
     </div>
     <div class="ph-actions">
+      <a class="btn" href="#/fiche/${t.code}?an=${sel}" title="Fiche de synthèse ${attr(t.code)} ${sel}, à enregistrer en PDF">${icon('download', 16)}Fiche PDF</a>
       <button class="btn btn-primary" data-edit-tax="${t.code}" data-year="${sel}">${icon('edit', 16)}${c?.rowId ? `Modifier ${sel}` : `Saisir ${sel}`}</button>
     </div>
   </section>

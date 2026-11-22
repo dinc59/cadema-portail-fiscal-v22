@@ -2,11 +2,14 @@
    La page affiche la synthèse telle qu'elle sera imprimée : c'est l'aperçu.
    « Enregistrer en PDF » ouvre la fenêtre d'impression du navigateur.
    Aucune bibliothèque, aucun envoi : tout reste sur le poste.
-   Pour ajouter la synthèse d'une autre page : une entrée dans FICHES. */
+   Pour ajouter la synthèse d'une autre page : une entrée dans FICHES.
+   Chaque recette fiscale a aussi sa fiche : #/fiche/<CODE>?an=AAAA. */
 import * as M from '../model.js';
-import { act, fieldsFor } from '../grist.js';
+import { rows, act, fieldsFor } from '../grist.js';
 import { esc, icon, fmt, toast, confirmDialog } from '../ui.js';
 import { LOGO, author, CREDIT } from '../main.js';
+import { statusBars, deltaBars } from '../charts.js';
+import { fmtTaux } from './recettes.js';
 
 /* ── Graphiques SVG imprimables ───────────────────────────────────── */
 const W = 682;
@@ -172,12 +175,80 @@ function relances(year, params) {
   return {title: 'Courriers de relance', back: '#/redevance?tab=recouvrement', letters: list, single: !!id};
 }
 
+/* ── Fiche d'une recette fiscale ──────────────────────────────────────
+   Mêmes chiffres que la page de la recette (taxHistory, taxCagr, taxTotal) :
+   la fiche ne recalcule rien, elle met en page. */
+const TAX_TONE = {'Définitif': 'var(--good)', 'Notifié': 'var(--good)', 'Renseigné': 'var(--info)', 'Prévision': 'var(--warn)'};
+const has = v => v !== null && v !== undefined && v !== '';
+function taxFiche(t, sel) {
+  const hist = M.taxHistory(t.code, sel);
+  const cur = hist.find(h => h.year === sel);
+  const c = cur?.cell;
+  const known = hist.filter(h => h.amount !== null);
+  const cagr = M.taxCagr(t.code);
+  const total = M.taxTotal(sel);
+  const share = c?.amount != null && total.total ? c.amount / total.total : null;
+  const prevAmount = M.taxCell(t.code, sel - 1)?.amount;
+  const prods = rows('Produits_Recettes').filter(r => M.text(r.Code_Produit).toUpperCase() === t.code).sort((a, b) => M.num(a.Exercice) - M.num(b.Exercice));
+  const fisc = hist.filter(h => has(h.cell?.taux) || has(h.cell?.base));
+  const color = `var(--s${t.slot})`;
+
+  const headline = c?.amount != null
+    ? `${fmt.eur(c.amount)} en ${sel}${cur.delta != null ? `, ${fmt.delta(cur.delta)} sur un an` : ''}`
+    : `Produit ${sel} non renseigné`;
+  const notes = [
+    c?.status === 'Prévision' && `Le montant ${sel} est une <b>prévision</b> : il sera remplacé par le produit notifié.`,
+    c?.dupes && `<b>${c.dupes} ligne${c.dupes > 1 ? 's' : ''} en double</b> pour ${sel} dans la table Taxes : la ligne la plus avancée est retenue.`,
+    c?.amount != null && total.covered < 6 && `Total des recettes ${sel} incomplet (${total.covered} produit${total.covered > 1 ? 's' : ''} sur 6) : la part est calculée sur ce total.`,
+    c?.amount == null && `Aucun produit n’est saisi pour ${sel} dans la table Taxes : il n’est pas compté comme zéro.`,
+  ].filter(Boolean);
+
+  const sections = [{kicker: 'L’essentiel', title: headline, html: `
+    ${kpis([
+      {label: `Produit ${sel}`, value: c?.amount != null ? fmt.eur(c.amount) : '—', sub: c ? c.status : 'Non renseigné'},
+      {label: 'Évolution sur un an', value: cur?.delta != null ? fmt.delta(cur.delta) : '—', sub: cur?.delta != null ? `${fmt.eur(prevAmount)} en ${sel - 1}` : `${sel - 1} ou ${sel} non renseigné`},
+      {label: 'Croissance annuelle moyenne', value: cagr ? fmt.delta(cagr.rate) : '—', sub: cagr ? `de ${cagr.from} à ${cagr.to}` : 'Au moins deux exercices nécessaires'},
+      {label: `Part des recettes ${sel}`, value: share != null ? fmt.pct(share, 1) : '—', sub: share != null ? `sur ${fmt.eur(total.total)}` : ''},
+    ])}
+    ${notes.length ? `<div class="fiche-alert is-warn"><p class="fiche-alert-h">À savoir</p><ul>${notes.map(n => `<li>${n}</li>`).join('')}</ul></div>` : ''}
+    <p class="fiche-note">${esc(t.about)}</p>`}];
+
+  sections.push({kicker: 'Trajectoire', title: `Produit par exercice${known.length ? `, ${known[0].year}–${known[known.length - 1].year}` : ''}`, html: `
+    <div class="report-chart">${statusBars(hist.map(h => ({year: h.year, amount: h.amount, status: h.cell?.status, source: h.cell?.source})), {slot: t.slot, width: W, height: 250, active: sel})}</div>
+    <div class="legend status-legend fiche-status" style="--c:${color}"><span><i class="lg lg-final"></i>Définitif ou notifié</span><span><i class="lg lg-filled"></i>Renseigné</span><span><i class="lg lg-forecast"></i>Prévision</span><span><i class="lg lg-gap"></i>Non renseigné</span></div>`});
+
+  if (hist.slice(1).some(h => h.delta != null)) sections.push({kicker: 'Dynamique', title: 'Évolution d’un exercice à l’autre', html: `
+    <div class="report-chart">${deltaBars(hist.slice(1).map(h => ({year: h.year, delta: h.delta})), {width: W, height: 210, active: sel})}</div>`});
+
+  sections.push({kicker: 'Fiscalité', title: fisc.length ? 'Taux et base nette' : 'Taux et base nette non renseignés', html: fisc.length ? `
+    <table class="fiche-table"><thead><tr><th>Exercice</th><th class="n">Taux</th><th class="n">Base nette</th></tr></thead>
+      <tbody>${[...fisc].reverse().map(h => `<tr class="${h.year === sel ? 'is-sel' : ''}"><td>${h.year}</td><td class="n">${esc(fmtTaux(h.cell.taux))}</td><td class="n">${has(h.cell.base) ? esc(fmt.eur(M.num(h.cell.base))) : '—'}</td></tr>`).join('')}</tbody></table>`
+    : '<p class="fiche-note">Les colonnes Taux et Base_Nette de la table Taxes sont vides pour cette recette.</p>'});
+
+  if (prods.length) sections.push({kicker: 'Budget', title: 'Exécution : prévu et réalisé', html: `
+    <table class="fiche-table"><thead><tr><th>Exercice</th><th>Budget</th><th class="n">Prévu</th><th class="n">Réalisé</th><th class="n">Écart</th><th class="n">Réalisation</th></tr></thead>
+      <tbody>${prods.map(p => { const pr = M.num(p.Prevision), re = M.num(p.Realise); return `<tr class="${M.num(p.Exercice) === sel ? 'is-sel' : ''}"><td>${M.num(p.Exercice)}</td><td>${esc(M.text(p.Budget))}</td>
+        <td class="n">${esc(fmt.eur(pr))}</td><td class="n">${esc(fmt.eur(re))}</td><td class="n">${esc(fmt.eur(re != null && pr != null ? re - pr : null))}</td><td class="n"><b>${esc(fmt.pct(pr ? (re || 0) / pr : null, 1))}</b></td></tr>`; }).join('')}</tbody></table>`});
+
+  sections.push({kicker: 'Traçabilité', title: 'Historique retenu', full: true, html: known.length ? `
+    <table class="fiche-table"><thead><tr><th>Exercice</th><th>Statut</th><th class="n">Produit</th><th class="n">Évolution</th><th>Source</th></tr></thead>
+      <tbody>${[...known].reverse().map(h => `<tr class="${h.year === sel ? 'is-sel' : ''}"><td>${h.year}</td><td><i class="fiche-dot" style="background:${TAX_TONE[h.cell?.status] || 'var(--ink-3)'}"></i>${esc(h.cell?.status || '—')}</td>
+        <td class="n">${esc(fmt.eur(h.amount))}</td><td class="n">${h.delta != null ? esc(fmt.delta(h.delta)) : '—'}</td><td class="fiche-src">${esc(h.cell?.source || '—')}</td></tr>`).join('')}</tbody></table>
+    <p class="fiche-note">Quand un exercice a plusieurs lignes dans la table Taxes, la plus avancée est retenue : définitif, puis renseigné, puis prévision ; à égalité, la plus récente.</p>`
+    : '<p class="fiche-empty">Aucun exercice renseigné.</p>'});
+
+  return {title: t.label, org: 'Fiche recette fiscale', tag: {code: t.code, color}, back: `#/recettes/${t.code}?an=${sel}`, crumb: t.code,
+    sections, years: hist.map(h => h.year), print: `Fiche ${t.code} ${sel} - CADEMA`};
+}
+
 const FICHES = {rs: {label: 'Redevance spéciale', build: rs}, relances: {label: 'Recouvrement', build: relances}};
+const taxOf = sub => M.taxByCode(String(sub || '').toUpperCase());
 
 export function render({year, sub, params}) {
-  const key = FICHES[sub] ? sub : 'rs';
+  const tax = !FICHES[sub] && taxOf(sub);
+  const key = FICHES[sub] ? sub : tax ? tax.code : 'rs';
   const y = Number(params.get('an')) || year;
-  const f = FICHES[key].build(y, params);
+  const f = tax ? taxFiche(tax, y) : FICHES[key].build(y, params);
   const now = new Date();
   if (f.letters) {
     const noAddr = f.letters.filter(c => !c.address).length;
@@ -196,16 +267,16 @@ export function render({year, sub, params}) {
   const ys = [...new Set([...(f.years || []), y])].sort((a, b) => b - a).slice(0, 6);
   return `
   <div class="report-tools">
-    <a class="crumb" href="${f.back}">${icon('left', 14)}${esc(FICHES[key].label)}</a>
+    <a class="crumb" href="${f.back}">${icon('left', 14)}${esc(f.crumb || FICHES[key].label)}</a>
     <span class="toolbar-gap"></span>
     <span class="fiche-years">${ys.map(v => `<a class="chip" aria-pressed="${v === y}" href="#/fiche/${key}?an=${v}">${v}</a>`).join('')}</span>
     <button class="btn btn-primary" data-print>${icon('download', 15)}Enregistrer en PDF</button>
   </div>
   <p class="report-hint">Aperçu de la synthèse telle qu’elle sera imprimée. Dans la fenêtre d’impression, choisissez « Enregistrer au format PDF ». Format A4 portrait.</p>
-  <article class="report fiche">
+  <article class="report fiche${f.tag ? ' fiche-tax' : ''}"${f.tag ? ` style="--fc:${f.tag.color}"` : ''}>
     <header class="report-head">
       ${LOGO.replace('logo-mark', 'logo-mark report-logo')}
-      <div><p class="report-org">CADEMA · Pôle fiscalité</p><h1>${esc(f.title)}</h1>
+      <div><p class="report-org">CADEMA · Pôle fiscalité${f.org ? ` · ${esc(f.org)}` : ''}</p>${f.tag ? `<p class="fiche-tag"><i></i>${esc(f.tag.code)} · exercice ${y}</p>` : ''}<h1>${esc(f.title)}</h1>
         <p class="report-meta">Établie le ${esc(now.toLocaleDateString('fr-FR'))}${author() !== 'Portail' ? ` par ${esc(author())}` : ''} · données du document Grist</p></div>
     </header>
     ${f.sections.map((s, i) => `<section class="report-sec${s.full ? ' is-long' : ''}">
@@ -237,7 +308,8 @@ export function mount(root, {sub, params, year}) {
   root.querySelector('[data-print]')?.addEventListener('click', () => {
     const title = document.title;
     const label = FICHES[sub]?.label || 'Synthèse';
-    document.title = sub === 'relances' ? `Courriers de relance RS ${new Date().toLocaleDateString('fr-CA')} - CADEMA` : `${label} ${Number(params.get('an')) || year} - synthèse CADEMA`;
+    const tax = !FICHES[sub] && taxOf(sub);
+    document.title = tax ? `Fiche ${tax.code} ${Number(params.get('an')) || year} - CADEMA` : sub === 'relances' ? `Courriers de relance RS ${new Date().toLocaleDateString('fr-CA')} - CADEMA` : `${label} ${Number(params.get('an')) || year} - synthèse CADEMA`;
     addEventListener('afterprint', () => { document.title = title; }, {once: true});
     print();
   });

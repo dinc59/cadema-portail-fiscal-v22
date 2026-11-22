@@ -3,6 +3,15 @@
    La plus récente en premier. `id` sert à savoir ce qu'un agent a déjà vu. */
 export const CHANGELOG = [
   {
+    id: '22.24', date: '2026-11-22', title: 'Une fiche PDF pour chaque recette fiscale',
+    summary: 'Chaque taxe a désormais sa fiche de synthèse, à enregistrer en PDF.',
+    items: [
+      {tag: 'Nouveau', text: 'Sur la page de chaque recette (VM, TEOM, CFE, CVAE, TASCOM, IFER), le bouton « Fiche PDF » ouvre une fiche A4 : l’essentiel de l’exercice, la trajectoire, l’évolution d’une année sur l’autre, taux et base nette, exécution budgétaire et historique avec ses sources. Les chiffres sont ceux de la page.', href: '#/recettes'},
+      {tag: 'Amélioré', text: 'La mention « © 2026, Made with ❤️ by Dina-Ben » figure en bas de chaque document PDF du portail, et en bas de toute page imprimée.'},
+      {tag: 'Corrigé', text: 'Synthèse PDF de la redevance : les chiffres clés ne sont plus séparés par des bandes grises.'},
+    ],
+  },
+  {
     id: '22.23', date: '2026-11-22', title: 'Graphiques et indicateurs repensés',
     summary: 'Le tableau de bord se lit d’un coup d’œil : courbes, anneau de répartition, chiffres qui suivent l’exercice choisi.',
     items: [
