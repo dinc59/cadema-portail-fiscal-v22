@@ -3,7 +3,7 @@
 import { db, connect, onChange, loadAll } from './grist.js';
 import * as M from './model.js';
 import { esc, attr, icon, fmt, avatar, toast, closeDrawer, drawerOpen } from './ui.js';
-import { spark, installTooltips } from './charts.js';
+import { spark, installTooltips, countUp, morph } from './charts.js';
 import * as accueil from './pages/accueil.js';
 import * as recettes from './pages/recettes.js';
 import * as redevance from './pages/redevance.js';
@@ -399,6 +399,11 @@ export function render({keepScroll = false, enter = keepScroll ? 'none' : 'full'
   root.innerHTML = `${header()}<main id="main" class="page page-${app.route.page}" tabindex="-1">${missingBanner}${page.render(ctx)}</main>
     <footer class="foot"><span>${LOGO.replace('logo-mark', 'logo-mark logo-sm')} Portail Fiscal CADEMA</span><span>Données : document Grist du pôle · lecture et écriture en direct · <a class="link" href="#/nouveautes">Nouveautés</a></span>${creditLine()}</footer>`;
   page.mount?.(root.querySelector('main'), ctx);
+  /* Chiffres qui montent (ou glissent vers le nouvel exercice) et anneaux qui
+     se déforment : commun à toutes les pages qui déclarent data-count / data-mk. */
+  const mainEl = root.querySelector('main');
+  countUp(mainEl);
+  mainEl.querySelectorAll('.ring, .dn').forEach(el => morph(el));
   fitNav();
   moveIndicator(false);
   tabsPill(enter === 'soft');

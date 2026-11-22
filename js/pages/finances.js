@@ -1,5 +1,6 @@
 import * as M from '../model.js';
 import { rows, act, fieldsFor } from '../grist.js';
+import { counted } from '../charts.js';
 import { esc, attr, icon, fmt, badge, empty, openDrawer, closeDrawer, toast, field, select, formData, downloadCsv } from '../ui.js';
 
 export function render({year, params}) {
@@ -49,7 +50,7 @@ function budget(year) {
       const missing = rec === null;
       return `<article class="card kpi">
         <span class="kpi-label">${esc(M.text(b.Budget))} · ${M.num(b.Exercice) ?? ''}</span>
-        <span class="kpi-value">${missing ? '<span class="miss">À importer</span>' : esc(fmt.short(res))}<small>${missing ? '' : 'résultat'}</small></span>
+        <span class="kpi-value">${missing ? '<span class="miss">À importer</span>' : counted(res, 'short', `fin-res-${b.id}`, esc(fmt.short(res)))}<small>${missing ? '' : 'résultat'}</small></span>
         <span class="kpi-meta">${missing ? esc(M.text(b.Source) || 'Source à préciser') : `Recettes ${esc(fmt.short(rec))} · Dépenses ${esc(fmt.short(dep))}`}</span>
         <span class="kpi-meta">${missing ? badge('Non importé', 'warn') : badge(M.text(b.Source) || 'CFU', 'neutral')}</span>
       </article>`;
@@ -91,7 +92,7 @@ function dotations(year) {
       const pop = M.num(d.Population), amt = M.num(d.Montant);
       return `<article class="card kpi">
         <span class="kpi-label">${esc(M.text(d.Intitule))} · ${M.num(d.Exercice) ?? ''}</span>
-        <span class="kpi-value">${esc(fmt.short(amt))}</span>
+        <span class="kpi-value">${counted(amt, 'short', `fin-dgf-${d.id}`, esc(fmt.short(amt)))}</span>
         <span class="kpi-meta">${pop ? `${esc(fmt.int(pop))} habitants · ${esc(fmt.eurc(amt / pop))} / hab.` : '&nbsp;'}</span>
         <span class="kpi-meta muted">${esc(M.text(d.Source))}</span>
       </article>`;
@@ -105,7 +106,7 @@ function dotations(year) {
       <div class="card-head"><div><h2>FPIC ${M.num(r.Exercice)} · répartition</h2><p class="card-sub">${esc(M.text(r.Mode))} · ${esc(M.text(r.Source))}</p></div>
         <button class="btn btn-sm" data-fpic="${r.id}">${icon('edit', 14)}Saisir la répartition</button></div>
       <div class="card-body">
-        <p class="kpi-value">${esc(fmt.eur(total))}</p>
+        <p class="kpi-value">${counted(total, 'eur', `fin-fpic-${r.id}`, esc(fmt.eur(total)))}</p>
         ${known.length ? `<div class="stackbar mt">${known.map(([l, v, c]) => `<span style="flex:${v};background:${c}" data-tip="${attr(`<b>${esc(l)}</b> · ${esc(fmt.eur(v))}`)}"></span>`).join('')}</div>
           <div class="legend mt">${parts.map(([l, v, c]) => `<span><span class="sw" style="background:${c}"></span>${esc(l)} · ${v !== null ? esc(fmt.eur(v)) : 'non saisi'}</span>`).join('')}</div>`
         : `<div class="notice mt">${icon('info', 16)}<span>La répartition entre l’EPCI et les communes n’est pas encore saisie. Elle figure dans la notification de la préfecture.</span></div>`}
@@ -161,7 +162,7 @@ function byBudget(year) {
       const parts = b.lines.filter(l => l.amount > 0);
       return `<article class="card kpi rb-kpi" data-rb-jump="${attr(b.key)}" role="button" tabindex="0" aria-label="Voir le détail du ${attr(b.label.toLowerCase())}">
         <span class="kpi-label">${esc(b.label)}</span>
-        <span class="kpi-value">${b.total === null ? '<span class="miss">Aucune donnée</span>' : esc(fmt.short(b.total))}</span>
+        <span class="kpi-value">${b.total === null ? '<span class="miss">Aucune donnée</span>' : counted(b.total, 'short', `fin-rb-${b.key}`, esc(fmt.short(b.total)))}</span>
         <span class="kpi-meta">${b.covered} recette${b.covered > 1 ? 's' : ''} renseignée${b.covered > 1 ? 's' : ''} sur ${b.expected}${all && b.total ? ` · ${esc(fmt.pct(b.total / all))} du total suivi` : ''}</span>
         ${parts.length ? `<span class="stackbar rb-stack" aria-hidden="true">${parts.map(l => `<span style="flex:${l.amount};background:${lineColor(l)}" data-tip="${attr(`<b>${esc(l.label)}</b> · ${esc(fmt.eur(l.amount))}`)}"></span>`).join('')}</span>` : ''}
         <span class="kpi-meta">${b.delta !== null

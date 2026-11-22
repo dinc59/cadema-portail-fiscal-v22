@@ -1,6 +1,6 @@
 import * as M from '../model.js';
 import { esc, attr, icon, fmt, badge } from '../ui.js';
-import { stackedBars, lineChart, ring, spark, donut, linkDonut, mountChart, countUp, morph } from '../charts.js';
+import { stackedBars, lineChart, ring, spark, donut, linkDonut, mountChart } from '../charts.js';
 import { unseen, markSeen } from '../changelog.js';
 
 /* Vue de la trajectoire (barres ou courbe), mémorisée sur ce poste. */
@@ -200,8 +200,6 @@ export function mount(root, {year}) {
     mountChart(slot, w => (line ? lineChart : stackedBars)(data, {width: w, active: year, key: 'home-traj'}), {replay});
   };
   drawTraj(false);
-  countUp(root);
-  root.querySelectorAll('.kpi-ring, .dn').forEach(el => morph(el));
   linkDonut(root.querySelector('[data-compo]'));
   root.addEventListener('click', e => {
     const tv = e.target.closest('[data-traj]');

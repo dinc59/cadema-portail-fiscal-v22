@@ -1,7 +1,7 @@
 import * as M from '../model.js';
 import { rows, act, fieldsFor } from '../grist.js';
 import { esc, attr, icon, fmt, badge, empty, openDrawer, closeDrawer, toast, field, select, formData, confirmDialog, downloadCsv, flash, motionOK } from '../ui.js';
-import { statusBars, deltaBars, spark, mountChart } from '../charts.js';
+import { statusBars, deltaBars, spark, mountChart, counted } from '../charts.js';
 import { author, render as rerender } from '../main.js';
 import { openImport, terrainStats } from './cfe-import.js';
 
@@ -171,14 +171,14 @@ function detail({year, params}, t) {
   </div>
 
   <section class="grid g-4 tax-kpis" style="--kc:var(--s${t.slot})">
-    <div class="card kpi kpi-lead"><span class="kpi-label">Produit ${sel}</span><span class="kpi-value">${c?.amount != null ? esc(fmt.eur(c.amount)) : '—'}</span>
+    <div class="card kpi kpi-lead"><span class="kpi-label">Produit ${sel}</span><span class="kpi-value">${c?.amount != null ? counted(c.amount, 'eur', `tax-${t.code}-amount`, esc(fmt.eur(c.amount))) : '—'}</span>
       <span class="kpi-meta">${c ? badge(c.status, statusTone(c.status)) : badge('Non renseigné', 'neutral')}${c?.dupes ? badge(`${c.dupes} doublon(s)`, 'critical') : ''}</span>
       <span class="kpi-meta muted">${esc(c?.source || 'Aucune source')}</span></div>
     <div class="card kpi"><span class="kpi-label">Évolution sur un an</span><span class="kpi-value">${cur?.delta != null ? `<span class="delta ${dc(cur.delta)}">${esc(fmt.delta(cur.delta))}</span>` : '—'}</span>
       <span class="kpi-meta">${cur?.delta != null ? `${esc(fmt.eur(M.taxCell(t.code, sel - 1).amount))} en ${sel - 1}` : c?.amount != null ? `${sel - 1} non renseigné` : `${sel} non renseigné`}</span></div>
     <div class="card kpi"><span class="kpi-label">Croissance annuelle moyenne</span><span class="kpi-value">${cagr ? `<span class="delta ${dc(cagr.rate)}">${esc(fmt.delta(cagr.rate))}</span>` : '—'}</span>
       <span class="kpi-meta">${cagr ? `de ${cagr.from} à ${cagr.to}, en moyenne chaque année` : 'Il faut au moins deux exercices renseignés'}</span></div>
-    <div class="card kpi"><span class="kpi-label">Part des recettes ${sel}</span><span class="kpi-value">${share != null ? esc(fmt.pct(share, 1)) : '—'}</span>
+    <div class="card kpi"><span class="kpi-label">Part des recettes ${sel}</span><span class="kpi-value">${share != null ? counted(share, 'pct1', `tax-${t.code}-share`, esc(fmt.pct(share, 1))) : '—'}</span>
       <div class="bar"><span style="width:${Math.round((share || 0) * 100)}%;background:var(--kc)"></span></div>
       <span class="kpi-meta">sur ${esc(fmt.eur(total.total))}${total.covered < 6 ? ` · ${total.covered}/6 produits` : ''}</span></div>
   </section>
@@ -381,11 +381,9 @@ function editTax({code = '', year, rowId = null}) {
 /* Change l'exercice affiché dans la fiche sans toucher à l'exercice global. */
 function pick(code, y) {
   history.replaceState(null, '', `#/recettes/${code}?an=${y}`);
+  /* Les chiffres glissent vers l'exercice choisi et la bande se déplace sur
+     les graphiques (compteurs et transitions communs, lancés après le rendu). */
   rerender({keepScroll: true});
-  if (!motionOK()) return;
-  document.querySelectorAll('.tax-kpis > *').forEach((el, i) => el.animate(
-    [{opacity: 0, transform: 'translateY(5px)'}, {opacity: 1, transform: 'none'}],
-    {duration: 220, delay: i * 30, easing: 'cubic-bezier(.23, 1, .32, 1)', fill: 'backwards'}));
 }
 
 export function mount(root, {year, sub, params}) {
@@ -395,9 +393,9 @@ export function mount(root, {year, sub, params}) {
     const sel = selYear(params, year);
     const hist = M.taxHistory(code, sel);
     mountChart(root.querySelector('[data-chart="prog"]'), w => statusBars(
-      hist.map(h => ({year: h.year, amount: h.amount, status: h.cell?.status, source: h.cell?.source})), {slot: t.slot, width: w, active: sel}));
+      hist.map(h => ({year: h.year, amount: h.amount, status: h.cell?.status, source: h.cell?.source})), {slot: t.slot, width: w, active: sel, key: `tax-${code}-prog`}));
     mountChart(root.querySelector('[data-chart="dyn"]'), w => deltaBars(
-      hist.slice(1).map(h => ({year: h.year, delta: h.delta})), {width: w, height: 280, active: sel}));
+      hist.slice(1).map(h => ({year: h.year, delta: h.delta})), {width: w, height: 280, active: sel, key: `tax-${code}-dyn`}));
     const target = params.get('tab');
     if (target && !document.body.classList.contains('no-enter')) root.querySelector(`#${CSS.escape(target)}`)?.scrollIntoView({block: 'start'});
   }

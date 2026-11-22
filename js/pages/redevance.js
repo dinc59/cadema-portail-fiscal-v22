@@ -1,5 +1,6 @@
 import * as M from '../model.js';
 import { rows, act, fieldsFor, uploadAttachment, openAttachment, attachmentIds } from '../grist.js';
+import { counted } from '../charts.js';
 import { esc, attr, icon, fmt, badge, empty, openDrawer, patchDrawer, drawerOpen, drawerId, toast, field, select, formData, downloadCsv, flash, confirmDialog } from '../ui.js';
 import { author, render as rerender } from '../main.js';
 import * as reco from './recouvrement.js';
@@ -142,11 +143,11 @@ export function render({year, params, sub}) {
   ${rsTabs('suivi', year)}
 
   <section class="grid g-4">
-    <div class="card kpi"><span class="kpi-label">Facturé ${year}</span><span class="kpi-value">${esc(fmt.short(data.billed))}</span><span class="kpi-meta">${esc(fmt.eurc(data.billed))}</span></div>
-    <div class="card kpi"><span class="kpi-label">Encaissé</span><span class="kpi-value">${esc(fmt.short(data.paid))}</span>
+    <div class="card kpi"><span class="kpi-label">Facturé ${year}</span><span class="kpi-value">${counted(data.billed, 'short', 'rs-billed', esc(fmt.short(data.billed)))}</span><span class="kpi-meta">${esc(fmt.eurc(data.billed))}</span></div>
+    <div class="card kpi"><span class="kpi-label">Encaissé</span><span class="kpi-value">${counted(data.paid, 'short', 'rs-paid', esc(fmt.short(data.paid)))}</span>
       <div class="bar"><span style="width:${Math.round((data.rate || 0) * 100)}%;background:var(--good)"></span></div><span class="kpi-meta">${esc(fmt.pct(data.rate, 1))} recouvré</span></div>
-    <div class="card kpi"><span class="kpi-label">Reste à recouvrer</span><span class="kpi-value">${esc(fmt.short(data.rest))}</span><span class="kpi-meta">${data.list.filter(x => x.rest > 0).length} entreprise(s) redevable(s)</span></div>
-    <button class="card kpi kpi-btn" data-sit="À vérifier"><span class="kpi-label">À vérifier</span><span class="kpi-value">${data.counts['À vérifier'] || 0}</span><span class="kpi-meta">dossier(s) à qualifier ${icon('arrow', 13)}</span></button>
+    <div class="card kpi"><span class="kpi-label">Reste à recouvrer</span><span class="kpi-value">${counted(data.rest, 'short', 'rs-rest', esc(fmt.short(data.rest)))}</span><span class="kpi-meta">${data.list.filter(x => x.rest > 0).length} entreprise(s) redevable(s)</span></div>
+    <button class="card kpi kpi-btn" data-sit="À vérifier"><span class="kpi-label">À vérifier</span><span class="kpi-value">${counted(data.counts['À vérifier'] || 0, 'int', 'rs-verify', String(data.counts['À vérifier'] || 0))}</span><span class="kpi-meta">dossier(s) à qualifier ${icon('arrow', 13)}</span></button>
   </section>
 
   <article class="card mt">

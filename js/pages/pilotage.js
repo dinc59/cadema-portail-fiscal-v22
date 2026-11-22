@@ -284,7 +284,7 @@ function qualityView(year) {
     </article>
     <aside class="stack">
       <article class="card card-pad score-card">
-        ${ring(q.score, {size: 132, stroke: 10, tone: q.score >= 80 ? 'good' : q.score >= 60 ? 'accent' : 'warn', label: 'sur 100'})}
+        ${ring(q.score, {size: 132, stroke: 10, tone: q.score >= 80 ? 'good' : q.score >= 60 ? 'accent' : 'warn', label: 'sur 100', key: 'pil-quality'})}
         <div><h2 class="card-title">Indice de qualité ${year}</h2>
         <p class="card-sub">${q.checks.filter(c => c.ok).length} contrôle(s) satisfait(s) sur ${q.checks.length}. Chaque contrôle compte au prorata de ce qui est conforme, pondéré : critique ×3, vigilance ×2, à compléter ×1.</p></div>
       </article>

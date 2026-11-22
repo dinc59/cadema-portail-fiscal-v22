@@ -5,6 +5,7 @@
    n'envoie rien lui-même. */
 import * as M from '../model.js';
 import { act, fieldsFor } from '../grist.js';
+import { counted } from '../charts.js';
 import { esc, attr, icon, fmt, badge, empty, openDrawer, patchDrawer, drawerOpen, drawerId, closeDrawer, toast, field, select, formData, flash } from '../ui.js';
 import { author } from '../main.js';
 
@@ -43,10 +44,10 @@ export function render() {
   <section class="grid g-4">
     ${M.RECOVERY_STAGES.map(s => `<button class="card kpi kpi-btn kpi-stage" data-stage="${attr(s.key)}">
       <span class="kpi-label"><span class="chip-dot tone-${s.tone}"></span>${esc(s.key)}</span>
-      <span class="kpi-value">${esc(fmt.short(rec.amounts[s.key] || 0))}</span>
+      <span class="kpi-value">${counted(rec.amounts[s.key] || 0, 'short', `rec-${s.key}`, esc(fmt.short(rec.amounts[s.key] || 0)))}</span>
       <span class="kpi-meta">${rec.counts[s.key] || 0} dossier(s) · ${esc(s.hint.toLowerCase())} ${icon('arrow', 13)}</span>
     </button>`).join('')}
-    <button class="card kpi kpi-btn" data-stage="due"><span class="kpi-label">Relances à faire</span><span class="kpi-value">${rec.due}</span><span class="kpi-meta">date de prochaine action passée ${icon('arrow', 13)}</span></button>
+    <button class="card kpi kpi-btn" data-stage="due"><span class="kpi-label">Relances à faire</span><span class="kpi-value">${counted(rec.due, 'int', 'rec-due', String(rec.due))}</span><span class="kpi-meta">date de prochaine action passée ${icon('arrow', 13)}</span></button>
   </section>
 
   <article class="card card-pad mt">

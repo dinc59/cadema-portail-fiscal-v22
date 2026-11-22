@@ -3,6 +3,17 @@
    La plus récente en premier. `id` sert à savoir ce qu'un agent a déjà vu. */
 export const CHANGELOG = [
   {
+    id: '22.23', date: '2026-11-22', title: 'Graphiques et indicateurs repensés',
+    summary: 'Le tableau de bord se lit d’un coup d’œil : courbes, anneau de répartition, chiffres qui suivent l’exercice choisi.',
+    items: [
+      {tag: 'Nouveau', text: 'Accueil : la trajectoire des produits fiscaux s’affiche en barres ou en courbe (votre choix est mémorisé). Sur la courbe, les tronçons en tirets signalent un exercice incomplet.', href: '#/'},
+      {tag: 'Nouveau', text: 'Accueil : la composition des recettes devient un anneau ; survolez une part ou une ligne pour voir sa part exacte, cliquez pour ouvrir la fiche du produit.', href: '#/'},
+      {tag: 'Amélioré', text: 'Cartes d’indicateurs : mini-courbe de l’historique, variation par rapport à l’exercice précédent, répartition des priorités.', href: '#/'},
+      {tag: 'Amélioré', text: 'Quand vous changez d’exercice, les chiffres et les graphiques glissent vers les nouvelles valeurs au lieu de tout redessiner (accueil, fiches recettes, redevance, recouvrement, finances, qualité).'},
+      {tag: 'Amélioré', text: 'Info-bulles posées au-dessus de la barre ou du point visé. Les graphiques se parcourent au clavier : Tab pour y entrer, flèches gauche et droite pour changer d’exercice, Entrée pour ouvrir.'},
+    ],
+  },
+  {
     id: '22.22', date: '2026-11-22', title: 'Menu toujours visible, pages plus vives',
     summary: 'Le menu tient à toutes les largeurs d’écran et les pages s’affichent plus vite.',
     items: [

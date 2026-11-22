@@ -75,6 +75,7 @@ const FMT = {
   eur: v => fmt.eur(Math.round(v)),
   int: v => fmt.int(Math.round(v)),
   pct: v => fmt.pct(v),
+  pct1: v => fmt.pct(v, 1),
 };
 export function countUp(root) {
   const b = document.body.classList;
@@ -106,6 +107,10 @@ export function countUp(root) {
     setTimeout(() => { el.textContent = final; el.classList.remove('is-counting'); }, dur + 160);
   });
 }
+
+/* Chiffre animable : le HTML garde le texte final, data-count porte la valeur. */
+export const counted = (v, kind, key, text) => v === null || v === undefined || !Number.isFinite(Number(v)) ? text
+  : `<span data-count="${v}" data-fmt="${kind}" data-count-key="${attr(key)}">${text}</span>`;
 
 /* Courbe lissée qui ne dépasse jamais ses points (monotone, Fritsch-Carlson). */
 function smoothPath(p, asSegments = false) {
@@ -177,7 +182,7 @@ export function lineChart(data, {width = 720, height = 280, active, key = ''} = 
       <rect class="hit" x="${x - band / 2}" y="${padT - 14}" width="${band}" height="${ih + padB + 14}" ${hitA(trajTip(d), isA)}${isA ? ' data-active' : ''} data-year="${d.year}"/>
       <line class="xhair" x1="${x}" x2="${x}" y1="${padT - 8}" y2="${y(0)}"/>
       ${has ? `<circle class="pt${partial ? ' pt-partial' : ''}${isA ? ' is-active' : ''}" cx="${f1(x)}" cy="${f1(y(d.total))}" r="${isA ? 5.5 : 4}"/>
-        ${isA || band >= 72 ? `<text class="val${isA ? ' val-active' : ''}" x="${x}" y="${f1(y(d.total) - 12)}" text-anchor="middle">${esc(fmt.short(d.total))}</text>` : ''}` : ''}
+        ${isA || band >= 72 ? `<text class="val${isA ? ' val-active' : ''}" x="${x > W - 36 ? W - 2 : x}" y="${f1(y(d.total) - 12)}" text-anchor="${x > W - 36 ? 'end' : 'middle'}">${esc(fmt.short(d.total))}</text>` : ''}` : ''}
       <text class="axis axis-x${isA ? ' is-active' : ''}" x="${x}" y="${H - padB + 18}" text-anchor="middle">${d.year}</text>
       <text class="axis axis-cov${partial ? ' is-warn' : ''}" x="${x}" y="${H - padB + 34}" text-anchor="middle">${d.covered}/${d.parts.length}</text>
     </g>`;
