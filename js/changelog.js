@@ -7,7 +7,7 @@ export const CHANGELOG = [
     summary: 'Chaque taxe a désormais sa fiche de synthèse, à enregistrer en PDF.',
     items: [
       {tag: 'Nouveau', text: 'Sur la page de chaque recette (VM, TEOM, CFE, CVAE, TASCOM, IFER), le bouton « Fiche PDF » ouvre une fiche A4 : l’essentiel de l’exercice, la trajectoire, l’évolution d’une année sur l’autre, taux et base nette, exécution budgétaire et historique avec ses sources. Les chiffres sont ceux de la page.', href: '#/recettes'},
-      {tag: 'Amélioré', text: 'La mention « © 2026, Made with ❤️ by Dina-Ben » figure en bas de chaque document PDF du portail, et en bas de toute page imprimée.'},
+      {tag: 'Amélioré', text: 'La mention passe en français : « © 2026, Fait avec ❤️ par Dina-Ben ». Elle figure en bas de chaque page, de chaque document PDF du portail et de toute page imprimée.'},
       {tag: 'Corrigé', text: 'Synthèse PDF de la redevance : les chiffres clés ne sont plus séparés par des bandes grises.'},
     ],
   },
@@ -141,7 +141,7 @@ export const CHANGELOG = [
       {tag: 'Nouveau', text: 'Documents : suppression en un clic des lignes vides de la table, quand leurs fichiers sont déjà classés ailleurs. Un fichier qui n’est classé nulle part n’est jamais supprimé : le portail propose de le classer.', href: '#/documents'},
       {tag: 'Corrigé', text: 'Quand un volet ou une confirmation est ouvert, la touche Tab reste à l’intérieur au lieu de parcourir la page derrière.'},
       {tag: 'Corrigé', text: 'Sur téléphone, les montants des graphiques ne se chevauchent plus : seul l’exercice affiché garde son étiquette, les autres s’affichent au toucher.'},
-      {tag: 'Amélioré', text: 'La mention « © 2026, Made with ❤️ by Dina-Ben » figure en bas de chaque page, en mode réunion et sur le point mensuel PDF.'},
+      {tag: 'Amélioré', text: 'La mention « © 2026, Fait avec ❤️ par Dina-Ben » figure en bas de chaque page, en mode réunion et sur le point mensuel PDF.'},
     ],
   },
   {

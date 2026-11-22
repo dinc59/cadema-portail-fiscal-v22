@@ -44,7 +44,7 @@ const NAV = [
   {id: 'documents', label: 'Documents', href: '#/documents'},
   {id: 'contacts', label: 'Contacts', href: '#/contacts'},
 ];
-export const CREDIT = '© 2026, Made with ❤️ by Dina-Ben';
+export const CREDIT = '© 2026, Fait avec ❤️ par Dina-Ben';
 const creditLine = (cls = '') => `<p class="credit${cls ? ` ${cls}` : ''}">${CREDIT}</p>`;
 
 const PAGES = {accueil, recettes, redevance, finances, pilotage, documents, equipe, nouveautes, reunion, rapport, taux, fiche, contacts};
