@@ -22,7 +22,8 @@ export function mountChart(slot, draw) {
     const nw = Math.max(260, Math.round(slot.clientWidth));
     if (!first && Math.abs(nw - w) < 8) return;
     w = nw;
-    slot.classList.toggle('chart-still', !first || document.body.classList.contains('no-enter'));
+    const b = document.body.classList;
+    slot.classList.toggle('chart-still', !first || b.contains('no-enter') || b.contains('seen-page'));
     slot.innerHTML = draw(w);
   };
   paint(true);

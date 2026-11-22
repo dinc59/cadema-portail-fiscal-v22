@@ -105,14 +105,14 @@ body.soft-enter .page > *:not(.ph):not(.toolbar):not(.crumb) { animation: fadein
 
 /* ── Jauges, barres de part et anneaux : remplissage à l'arrivée ───── */
 .bar > span, .compo-bar span, .cfu-bar > span { transform-origin: left; }
-body:not(.no-enter) .bar > span,
-body:not(.no-enter) .compo-bar span,
-body:not(.no-enter) .cfu-bar > span,
-body:not(.no-enter) .exec-bar > span { animation: grow-x 620ms var(--ease-out) both 140ms; }
+body:not(.no-enter):not(.seen-page) .bar > span,
+body:not(.no-enter):not(.seen-page) .compo-bar span,
+body:not(.no-enter):not(.seen-page) .cfu-bar > span,
+body:not(.no-enter):not(.seen-page) .exec-bar > span { animation: grow-x 620ms var(--ease-out) both 140ms; }
 @keyframes grow-x { from { transform: scaleX(.02); } }
-body:not(.no-enter) .stackbar { animation: reveal-x 620ms var(--ease-out) both 140ms; }
+body:not(.no-enter):not(.seen-page) .stackbar { animation: reveal-x 620ms var(--ease-out) both 140ms; }
 @keyframes reveal-x { from { clip-path: inset(0 100% 0 0 round 7px); } to { clip-path: inset(0 0 0 0 round 7px); } }
-body:not(.no-enter) .ring-val { animation: ring-draw 760ms var(--ease-out) both 140ms; }
+body:not(.no-enter):not(.seen-page) .ring-val { animation: ring-draw 760ms var(--ease-out) both 140ms; }
 @keyframes ring-draw { from { stroke-dashoffset: var(--c); } }
 
 /* ── Enregistrement en cours : la pastille du profil bat ───────────── */

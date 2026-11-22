@@ -348,6 +348,7 @@ function shellState() {
 }
 
 let lastTab = null;
+const seenPages = new Set();
 /* Pastille des onglets : elle glisse de l'ancien onglet vers le nouveau. */
 function tabsPill(slide) {
   const tabs = root.querySelector('main .tabs');
@@ -386,6 +387,11 @@ export function render({keepScroll = false, enter = keepScroll ? 'none' : 'full'
 
   document.body.classList.toggle('no-enter', enter === 'none');
   document.body.classList.toggle('soft-enter', enter === 'soft');
+  /* Les graphiques et jauges se dessinent à la première visite d'une page
+     pendant la séance ; aux visites suivantes ils sont là tout de suite. */
+  const pageKey = `${app.route.page}/${app.route.sub || ''}`;
+  document.body.classList.toggle('seen-page', enter !== 'none' && seenPages.has(pageKey));
+  seenPages.add(pageKey);
   const ctx = {year: app.year, sub: app.route.sub, params: app.route.params, app, render};
   const missingBanner = db.status === 'ready' && db.missing.length && !['fiche', 'rapport'].includes(app.route.page)
     ? `<div class="notice notice-critical missing-banner" role="alert">${icon('alert', 16)}<span><b>${db.missing.length} table${db.missing.length > 1 ? 's' : ''} Grist non chargée${db.missing.length > 1 ? 's' : ''} : ${esc(db.missing.join(', '))}.</b> Les chiffres qui en dépendent sont incomplets : un montant absent n’est pas forcément nul.</span></div>`
@@ -393,6 +399,7 @@ export function render({keepScroll = false, enter = keepScroll ? 'none' : 'full'
   root.innerHTML = `${header()}<main id="main" class="page page-${app.route.page}" tabindex="-1">${missingBanner}${page.render(ctx)}</main>
     <footer class="foot"><span>${LOGO.replace('logo-mark', 'logo-mark logo-sm')} Portail Fiscal CADEMA</span><span>Données : document Grist du pôle · lecture et écriture en direct · <a class="link" href="#/nouveautes">Nouveautés</a></span>${creditLine()}</footer>`;
   page.mount?.(root.querySelector('main'), ctx);
+  fitNav();
   moveIndicator(false);
   tabsPill(enter === 'soft');
   mounted = true;
@@ -402,6 +409,29 @@ export function render({keepScroll = false, enter = keepScroll ? 'none' : 'full'
     if (el) { el.focus({preventScroll: true}); try { el.setSelectionRange(selStart, selEnd); } catch { /* select */ } }
   }
   if (keepScroll) scrollTo(0, scroll);
+}
+
+/* Le menu doit toujours tenir, quelle que soit la largeur (écran large, panneau
+   Grist étroit) : on retire d'abord le mot « Exercice », puis la recherche
+   passe en icône, puis le menu se replie derrière le bouton « Menu ». */
+function fitNav() {
+  const nav = root.querySelector('.nav');
+  const cl = document.body.classList;
+  /* La mesure retire puis remet les classes : sans cette coupure, le menu
+     replié rejouerait son animation de fermeture à chaque rendu. */
+  if (nav) nav.style.transition = 'none';
+  cl.remove('nav-short', 'nav-tight', 'nav-collapse');
+  if (nav && !matchMedia('(max-width: 960px)').matches) {
+    /* On compare le dernier lien au bord du menu (scrollWidth compterait aussi
+       le déplacement de la barre dorée). */
+    const last = nav.querySelector('.nav-item:last-child');
+    const over = () => last && last.getBoundingClientRect().right > nav.getBoundingClientRect().right + 1;
+    for (const step of ['nav-short', 'nav-tight', 'nav-collapse']) {
+      if (!over()) break;
+      cl.add(step);
+    }
+  }
+  if (nav) { getComputedStyle(nav).opacity; nav.style.transition = ''; }
 }
 
 function moveIndicator(animate = true) {
@@ -523,7 +553,9 @@ document.addEventListener('keydown', e => {
   }
 });
 addEventListener('hashchange', onRoute);
-addEventListener('resize', () => { closePop(); moveIndicator(false); });
+addEventListener('resize', () => { closePop(); fitNav(); moveIndicator(false); });
+/* Les polices arrivent après le premier rendu et élargissent les liens. */
+document.fonts?.ready.then(() => { fitNav(); moveIndicator(false); });
 
 onChange(reason => {
   if (reason === 'saving' || reason === 'sync') {

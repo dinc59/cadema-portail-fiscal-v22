@@ -3,6 +3,15 @@
    La plus récente en premier. `id` sert à savoir ce qu'un agent a déjà vu. */
 export const CHANGELOG = [
   {
+    id: '22.22', date: '2026-11-22', title: 'Menu toujours visible, pages plus vives',
+    summary: 'Le menu tient à toutes les largeurs d’écran et les pages s’affichent plus vite.',
+    items: [
+      {tag: 'Corrigé', text: 'Le lien « Documents » ne passe plus sous les boutons de droite, sur grand écran comme dans un panneau Grist étroit : le menu se resserre, puis se replie derrière le bouton « Menu » s’il ne tient pas.'},
+      {tag: 'Amélioré', text: 'Les graphiques et jauges se dessinent à la première visite d’une page ; quand on y revient, ils sont affichés tout de suite. L’arrivée sur une page est plus courte.'},
+      {tag: 'Amélioré', text: 'Sur téléphone : le bandeau des nouveautés est lisible, et les boutons de l’en-tête sont plus faciles à toucher.'},
+    ],
+  },
+  {
     id: '22.21', date: '2026-11-21', title: 'Taux : une page en trois onglets',
     summary: 'La page Taux était trop chargée : elle se lit maintenant en trois onglets.',
     items: [

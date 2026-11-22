@@ -203,8 +203,9 @@ input.sel { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); c
 .bulk-field select:focus-visible { box-shadow: inset 0 0 0 1.5px var(--gold); }
 .bulk .bulk-x { color: var(--top-ink-2); }
 @media (hover: hover) and (pointer: fine) { .bulk .bulk-x:hover { background: var(--top-2); color: var(--top-ink); } }
-body:has(.bulk[data-show]) .toasts { bottom: 84px; }
-.toasts { transition: bottom 200ms var(--ease-out); }
+/* Les messages montent au-dessus de la barre en série (transform : pas de recalcul de mise en page). */
+body:has(.bulk[data-show]) .toasts { transform: translateY(-68px); }
+.toasts { transition: transform 200ms var(--ease-out); }
 
 /* ── Saisie rapide des SIRET ──────────────────────────────────────── */
 .quick-note { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--surface-2); flex-wrap: wrap; }
@@ -214,14 +215,14 @@ body:has(.bulk[data-show]) .toasts { bottom: 84px; }
 .quick-progress { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: baseline; min-width: 180px; font-size: 12.5px; color: var(--ink-3); }
 .quick-progress b { font-family: var(--serif); font-size: 20px; font-weight: 500; color: var(--ink); }
 .quick-progress .bar { grid-column: 1 / -1; height: 5px; }
-.quick-progress .bar > span { background: var(--good); transition: width 300ms var(--ease-out); }
+.quick-progress .bar > span { background: var(--good); }
 .siret-cell { width: 230px; }
 .siret-wrap { position: relative; display: block; }
 .siret-in { width: 100%; height: 34px; font-family: var(--mono); font-size: 13px; letter-spacing: .02em; padding-right: 32px; }
 .siret-in[aria-invalid="true"] { box-shadow: inset 0 0 0 1.5px var(--critical), 0 0 0 4px color-mix(in srgb, var(--critical) 14%, transparent); }
 .siret-ok { position: absolute; right: 9px; top: 50%; translate: 0 -50%; color: var(--good); display: grid; }
 .siret-ok { animation: pop-in 220ms var(--ease-out) both; }
-@keyframes pop-in { from { opacity: 0; transform: scale(.6); } }
+@keyframes pop-in { from { opacity: 0; transform: scale(.9); } }
 body.no-enter .siret-ok { animation: none; }
 .rs-table tr.is-done td:not(.siret-cell):not(.sel-cell) { color: var(--ink-3); }
 
