@@ -497,8 +497,10 @@ document.addEventListener('click', e => {
     /* L'exercice global reprend la main sur l'exercice choisi dans une fiche. */
     if (/[?&]an=\d+/.test(location.hash)) history.replaceState(null, '', location.hash.replace(/([?&])an=\d+&?/, '$1').replace(/[?&]$/, ''));
     render({keepScroll: true});
-    /* Tout le contenu vient de changer : un fondu bref le signale. */
-    root.querySelector('main')?.animate([{opacity: .35}, {opacity: 1}], {duration: 220, easing: 'ease-out'});
+    /* Tout le contenu vient de changer : un fondu bref le signale, sauf sur
+       les pages dont les chiffres et graphiques glissent d'eux-mêmes vers le
+       nouvel exercice. */
+    if (!root.querySelector('main [data-count], main [data-mk]')) root.querySelector('main')?.animate([{opacity: .35}, {opacity: 1}], {duration: 220, easing: 'ease-out'});
     toast(`Exercice ${app.year}`, 'info', {timeout: 1800});
     return;
   }
