@@ -7,7 +7,7 @@ const st = {q: '', type: '', year: ''};
 /* Type et exercice proposés quand on dépose depuis la grille des états. */
 let preset = null;
 const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-const typeIcon = t => /1259|1386|EDET|EDAC/.test(t) ? 'table' : /onvention|élib/i.test(t) ? 'edit' : /ourrier/i.test(t) ? 'mail' : 'file';
+const typeIcon = t => /1259|1386|EDET|EDAC|FPIC/.test(t) ? 'table' : /onvention|élib/i.test(t) ? 'edit' : /ourrier/i.test(t) ? 'mail' : 'file';
 
 const DOC_COLS = ['Document_ID', 'Type_Document', 'Exercice', 'Titre', 'Module', 'Fichier', 'Lien', 'Confidentialite', 'Ajoute_Par', 'Date_Ajout', 'Version', 'Statut', 'Taille_Octets'];
 function orphans() {
@@ -27,7 +27,7 @@ function list() {
   return M.documents().filter(d => (!st.type || d.type === st.type) && (!st.year || String(d.year) === st.year) &&
     (!words.length || words.every(w => norm(`${d.title} ${d.type} ${d.year} ${d.author}`).includes(w))));
 }
-const typeTone = t => /^(1259|1386|EDET|EDAC)$/.test(t) ? 'info' : /élib/i.test(t) ? 'accent' : /onvention/i.test(t) ? 'good' : /ourrier/i.test(t) ? 'warn' : 'neutral';
+const typeTone = t => /^(1259|1386|EDET|EDAC|FPIC)$/.test(t) ? 'info' : /élib/i.test(t) ? 'accent' : /onvention/i.test(t) ? 'good' : /ourrier/i.test(t) ? 'warn' : 'neutral';
 const cap = w => w.charAt(0).toUpperCase() + w.slice(1);
 function docRow(d) {
   const ids = attachmentIds(d.file);
@@ -76,7 +76,7 @@ function statesCard() {
     return `<button class="sg-c ${closed ? 'is-missing' : 'is-pending'}" data-state-upload="${attr(`${c.type}|${y}`)}" aria-label="Déposer ${esc(c.type)} ${y}">${icon(closed ? 'alert' : 'upload', 15)}<span>${closed ? 'Manquant' : 'À recevoir'}</span></button>`;
   };
   return `<article class="card mt states-card">
-    <div class="card-head"><div><p class="card-eyebrow">États fiscaux</p><h2>1259, 1386, EDET et EDAC par exercice</h2>
+    <div class="card-head"><div><p class="card-eyebrow">États fiscaux</p><h2>1259, 1386, EDET et FPIC par exercice</h2>
       <p class="card-sub">Cliquez un état présent pour l’ouvrir (ou voir toutes ses pièces), un état manquant pour le déposer directement au bon exercice.</p></div>
       ${missing.length ? badge(`${missing.length} manquant${missing.length > 1 ? 's' : ''}`, 'warn') : badge('Complet', 'good')}</div>
     <div class="card-body"><div class="states-grid" role="table" aria-label="États fiscaux par exercice">

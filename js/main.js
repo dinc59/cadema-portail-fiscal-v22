@@ -278,7 +278,7 @@ function paletteItems() {
     {kind: 'Page', label: 'Propositions 2027 et simulateur de taux', href: '#/taux?tab=2027', ic: 'chart'},
     {kind: 'Page', label: 'Taxe GEMAPI', href: '#/taux?tab=gemapi', ic: 'landmark'},
     {kind: 'Page', label: 'Synthèse PDF de la redevance spéciale', href: '#/fiche/rs', ic: 'download'},
-    {kind: 'Page', label: 'États fiscaux (1259, 1386, EDET, EDAC)', href: '#/documents', ic: 'table'},
+    {kind: 'Page', label: 'États fiscaux (1259, 1386, EDET, FPIC)', href: '#/documents', ic: 'table'},
     {kind: 'Page', label: 'Équipe & paramètres', href: '#/equipe', ic: 'users'},
     ...M.TAXES.map(t => ({kind: 'Recette', label: `${t.code} · ${t.label}`, href: `#/recettes/${t.code}`, ic: 'coins'})),
     ...M.companies().map(c => ({kind: 'Entreprise', label: c.name, sub: [c.activity, c.siret].filter(Boolean).join(' · '), href: `#/redevance/${encodeURIComponent(c.id)}`, ic: 'building'})),

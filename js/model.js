@@ -349,7 +349,7 @@ export function events() {
 }
 
 /* ── Documents ─────────────────────────────────────────────────────── */
-export const DOC_TYPES = ['1259', '1386', 'EDET', 'EDAC', 'Délibérations', 'Conventions', 'Courriers DGFiP', 'Budget & CFU', 'Autre'];
+export const DOC_TYPES = ['1259', '1386', 'EDET', 'FPIC', 'EDAC', 'Délibérations', 'Conventions', 'Courriers DGFiP', 'Budget & CFU', 'Autre'];
 export function documents() {
   return rows('Documents_Fiscaux').filter(r => text(r.Titre)).map(r => ({
     rowId: r.id, id: text(r.Document_ID), title: text(r.Titre), type: text(r.Type_Document) || 'Autre',
@@ -419,7 +419,7 @@ export function quality(year) {
     fix: 'Ouvrir la fiche et créer le suivi de l’exercice.', route: `#/redevance?situation=${encodeURIComponent('Sans suivi')}`, ratio: rs.list.length ? noTrack.length / rs.list.length : 0});
 
   const lostStates = missingStates(year).filter(s => Number(s.slice(-4)) >= year - 3);
-  add({id: 'states', level: 'warn', title: 'États fiscaux absents (1259, 1386, EDET, EDAC)',
+  add({id: 'states', level: 'warn', title: 'États fiscaux absents (1259, 1386, EDET, FPIC)',
     ok: !lostStates.length, count: lostStates.length, detail: lostStates.join(' · '),
     fix: 'Les déposer depuis la grille des états fiscaux, dans Documents.', route: '#/documents', ratio: lostStates.length / (STATE_TYPES.length * 3)});
 
@@ -584,7 +584,8 @@ export function revenueByBudget(year) {
 }
 
 /* ── États fiscaux par exercice ────────────────────────────────────── */
-export const STATE_TYPES = ['1259', '1386', 'EDET', 'EDAC'];
+/* La notification FPIC a remplacé l'EDAC dans la grille (22/11/2026) ; EDAC reste un type de document. */
+export const STATE_TYPES = ['1259', '1386', 'EDET', 'FPIC'];
 export function statesGrid(lastYear) {
   const docs = documents().filter(d => STATE_TYPES.includes(d.type) && d.year);
   const first = Math.min(lastYear - 5, ...docs.map(d => d.year));

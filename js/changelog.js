@@ -3,6 +3,14 @@
    La plus récente en premier. `id` sert à savoir ce qu'un agent a déjà vu. */
 export const CHANGELOG = [
   {
+    id: '22.25', date: '2026-11-23', title: 'FPIC dans la grille des états fiscaux',
+    summary: 'La grille des documents suit désormais la notification FPIC à la place de l’EDAC.',
+    items: [
+      {tag: 'Amélioré', text: 'Documents : la grille des états fiscaux affiche 1259, 1386, EDET et FPIC par exercice. Une case FPIC manquante se clique pour déposer la notification au bon exercice.', href: '#/documents'},
+      {tag: 'Amélioré', text: 'Le contrôle « États fiscaux absents » de la qualité des données compte désormais le FPIC au lieu de l’EDAC. Le type EDAC reste disponible pour classer un document.'},
+    ],
+  },
+  {
     id: '22.24', date: '2026-11-22', title: 'Une fiche PDF pour chaque recette fiscale',
     summary: 'Chaque taxe a désormais sa fiche de synthèse, à enregistrer en PDF.',
     items: [
